@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <string>
 #include <sstream>
+#include <tuple>
 
 #include "utils.h"
 #include "config_param_parsing.h"
@@ -13,19 +14,9 @@
 
 #include "scip/scip.h"
 #include "scip/scipdefplugins.h"
-
-bool are_edges_the_same_undirected_graphs(Edge edge1, Edge edge2) {
-  return ((edge1.start.number == edge2.start.number) && (edge1.end.number == edge2.end.number)) || 
-         ((edge1.start.number == edge2.end.number) && (edge1.end.number == edge2.start.number));
-}
-
-/// Compare two edges for equality
-/// @param edge1 first edge
-/// @param edge2 second edge
-/// @return true if edges are equal false otherwise
-bool are_edges_the_same_directed_graphs(Edge edge1, Edge edge2) {
-  return (edge1.start.number == edge2.start.number) && (edge1.end.number == edge2.end.number);
-}
+#include "scip/struct_prob.h"
+#include "scip/struct_scip.h"
+#include "scip/sol.h"
 
 /// Add first constraint to the problem 
 /// SUM_(e∈E) X_e = |V|
@@ -58,6 +49,7 @@ SCIP_RETCODE add_first_constraint(SCIP *scip, Graph first, Graph second) {
 
   // TODO: remove this print 
   SCIP_CALL(SCIPprintCons(scip, constraint, NULL));
+  SCIPinfoMessage(scip, NULL,  "\n");
 
   SCIP_CALL(SCIPreleaseCons(scip, &constraint));
 
@@ -106,7 +98,8 @@ SCIP_RETCODE add_second_constraint(SCIP *scip, Graph first, Graph second, TypeOf
 
           // TODO: remove this print
           SCIP_CALL(SCIPprintCons(scip, constraint_ingoing_edges, NULL));
-          printf("\n");
+          SCIPinfoMessage(scip, NULL,  "\n");
+
 
           SCIP_CALL(SCIPreleaseCons(scip, &constraint_ingoing_edges));
 
@@ -116,6 +109,7 @@ SCIP_RETCODE add_second_constraint(SCIP *scip, Graph first, Graph second, TypeOf
           
           // TODO: remove this print
           SCIP_CALL(SCIPprintCons(scip, constraint_outgoing_edges, NULL));
+          SCIPinfoMessage(scip, NULL,  "\n");
 
           SCIP_CALL(SCIPreleaseCons(scip, &constraint_outgoing_edges));
 
@@ -155,6 +149,7 @@ SCIP_RETCODE add_second_constraint(SCIP *scip, Graph first, Graph second, TypeOf
 
           // TODO: remove this print
           SCIP_CALL(SCIPprintCons(scip, constraint, NULL));
+          SCIPinfoMessage(scip, NULL,  "\n");
 
           SCIP_CALL(SCIPreleaseCons(scip, &constraint));
 
@@ -173,16 +168,16 @@ SCIP_RETCODE add_second_constraint(SCIP *scip, Graph first, Graph second, TypeOf
 /// @param edge Edge to compare with
 /// @param graph_type Type of graph
 /// @return Returns true if edge contains in the array, otherwise returns false
-bool is_edge_contains_in(Edge *edges, Edge edge, TypeOfGraph graph_type) {
+bool is_edge_contains_in(Tuple<Edge> *edges, Edge edge, TypeOfGraph graph_type) {
   if (graph_type == TypeOfGraph::DIRECTED) {
     for (int i = 0; i < sb_count(edges); i++) {
-      if (are_edges_the_same_directed_graphs(edges[i], edge)) {
+      if (are_edges_the_same_directed_graphs(edges[i].first, edge)) {
         return true;
       }
     }
   } else if (graph_type == TypeOfGraph::UNDIRECTED) {
     for (int i = 0; i < sb_count(edges); i++) {
-      if (are_edges_the_same_undirected_graphs(edges[i], edge)) {
+      if (are_edges_the_same_undirected_graphs(edges[i].first, edge)) {
         return true;
       }
     }
@@ -193,7 +188,13 @@ bool is_edge_contains_in(Edge *edges, Edge edge, TypeOfGraph graph_type) {
   return false;
 }
 
-SCIP_RETCODE add_third_constraint(SCIP *scip, Graph graph, Edge *same_edges, TypeOfGraph graph_type) {
+/// Add (3) or (4) constraint to the problem
+/// @param scip SCIP problem formulation variable
+/// @param graph Cycle which is used to construct constraint
+/// @param same_edges Array of edges that are present in both cycles
+/// @param graph_type Type of graph
+/// @return SCIP_RETCODE
+SCIP_RETCODE add_third_or_fourth_constraint(SCIP *scip, Graph graph, Tuple<Edge> *same_edges, TypeOfGraph graph_type, const char *name_of_constraint) {
   SCIP_CONS *constraint = NULL;
   SCIP_VAR **constraint_variables = NULL;
 
@@ -214,11 +215,13 @@ SCIP_RETCODE add_third_constraint(SCIP *scip, Graph graph, Edge *same_edges, Typ
     sb_push(values, 1.0);
   }
 
-
-  SCIP_CALL(SCIPcreateConsBasicLinear(scip, &constraint, "Third constraint", 
+  SCIP_CALL(SCIPcreateConsBasicLinear(scip, &constraint, name_of_constraint, 
       sb_count(constraint_variables), constraint_variables, values, -SCIPinfinity(scip), number_of_verticies - sb_count(same_edges) - 2));
   SCIP_CALL(SCIPaddCons(scip, constraint));
+  
+  // TODO: remove
   SCIP_CALL(SCIPprintCons(scip, constraint, NULL));
+  SCIPinfoMessage(scip, NULL,  "\n");
 
   SCIP_CALL(SCIPreleaseCons(scip, &constraint));
 
@@ -230,8 +233,8 @@ SCIP_RETCODE add_third_constraint(SCIP *scip, Graph graph, Edge *same_edges, Typ
 /// @param second Second cycle
 /// @param graph_type Type of graph
 /// @return Array of same edges for both cycles
-Edge *find_same_edges(Graph first, Graph second, TypeOfGraph graph_type) {
-  Edge *same_edges = NULL;
+Tuple<Edge> *find_same_edges(Graph first, Graph second, TypeOfGraph graph_type) {
+  Tuple<Edge> *same_edges = NULL;
   
   if (graph_type == TypeOfGraph::DIRECTED) {
     for (size_t i = 0; i < first.number_of_edges(); i++) {
@@ -241,7 +244,7 @@ Edge *find_same_edges(Graph first, Graph second, TypeOfGraph graph_type) {
 
         // Check edges for equality
         if (are_edges_the_same_directed_graphs(first_cycle_edge, second_cycle_edge)) {
-          sb_push(same_edges, first_cycle_edge);
+          sb_push(same_edges, Tuple<Edge>({first_cycle_edge, second_cycle_edge}));
           break;
         }
       }
@@ -254,7 +257,7 @@ Edge *find_same_edges(Graph first, Graph second, TypeOfGraph graph_type) {
 
         // Check edges for equality
         if (are_edges_the_same_undirected_graphs(first_cycle_edge, second_cycle_edge)) {
-          sb_push(same_edges, first_cycle_edge);
+          sb_push(same_edges, Tuple<Edge>({first_cycle_edge, second_cycle_edge}));
           break;
         }
       }
@@ -264,6 +267,82 @@ Edge *find_same_edges(Graph first, Graph second, TypeOfGraph graph_type) {
   }
 
   return same_edges;
+}
+
+/// (7) Constraint
+/// Separate same edges to different cycles
+SCIP_RETCODE add_seventh_constraint(SCIP *scip, Tuple<Edge> *same_edges) {
+  SCIP_CONS *constraint;
+  SCIP_Real coefficient = 1.0;
+
+  for (int i = 0; i < sb_count(same_edges); i++) {
+    Tuple<Edge> tp = same_edges[i];
+
+    Edge z_cycle_edge = tp.first;
+    SCIP_CALL(SCIPcreateConsBasicLinear(scip, &constraint, "Separation Constraint. Z cycle", 1, &z_cycle_edge.var, &coefficient, 1.0, 1.0));
+    SCIP_CALL(SCIPaddCons(scip, constraint));
+
+    // TODO: remove
+    SCIP_CALL(SCIPprintCons(scip, constraint, NULL));
+    SCIPinfoMessage(scip, NULL,  "\n");
+
+    SCIP_CALL(SCIPreleaseCons(scip, &constraint));
+
+    Edge w_cycle_edge = tp.second;
+    SCIP_CALL(SCIPcreateConsBasicLinear(scip, &constraint, "Separation Constraint. W cycle", 1, &w_cycle_edge.var, &coefficient, 0.0, 0.0));
+    SCIP_CALL(SCIPaddCons(scip, constraint));
+    
+    // TODO: remove
+    SCIP_CALL(SCIPprintCons(scip, constraint, NULL));
+    SCIPinfoMessage(scip, NULL,  "\n");
+
+    SCIP_CALL(SCIPreleaseCons(scip, &constraint));
+  }
+
+  return SCIP_OKAY;
+}
+
+/// Find cycle
+/// Returns newly allocated cycle.
+Edge* find_cycle(Edge *graph) {
+  Edge *cycle = NULL;
+  for (int i = 0; i < sb_count(graph); i++) {
+    Edge edge = graph[i];
+    if (edge.available == false) { continue; }
+
+    for (int j = i; j < sb_count(graph); j++) {
+      int edge_index = (j + 1 == sb_count(graph)) ? 0 : j + 1;
+      Edge next_edge = graph[edge_index];
+
+      
+    }
+  }
+}
+
+/// Find components of a graph and add them to constraints of the problem
+/// @param graph Graph to find 
+/// @return Return true if found cycle is hamilton cycle of the graph, false otherwise
+bool find_cycles_and_add_to_constraints(SCIP *scip, Edge *graph, Tuple<Edge> *same_edges) {
+  // Try to find cycles until all edges are not available
+  while (true) {
+    Edge *current_cycle = find_cycle(graph);
+
+    // Current cycle is Hamilton cycle
+    if (sb_count(current_cycle) == sb_count(graph)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// Analyzes Z-graph and W-graph 
+/// @return If Z-graph and W-graph are new Hamilton Decomposition return true otherwise false
+bool cycles_are_new_decomposition(SCIP *scip, Edge *z_graph, Edge *w_graph, Tuple<Edge> *same_edges) {
+  bool z_graph_is_complete_cycle = false;
+  bool w_graph_is_complete_cycle = false;
+  
+  return z_graph_is_complete_cycle && w_graph_is_complete_cycle;
 }
 
 /// Initialize SCIP
@@ -285,7 +364,7 @@ int main(int argc, char **argv) {
   // Load configuration file into the program
   ConfigFlags flags = load_config_file(argc, argv);
 
-  const char *path_to_the_file = "test_cases\\test_6_undir_paper.txt";
+  const char *path_to_the_file = "test_cases\\test_6_undir_paper_motor.txt";
 
   FILE *file = NULL;
   int error_code = fopen_s(&file, path_to_the_file, "r");
@@ -307,29 +386,80 @@ int main(int argc, char **argv) {
   init_scip(&scip);
 
   // Add variables to the problem from cycles
+  Edge *all_edges = NULL;
   for (size_t i = 0; i < first.number_of_verticies(); i++) {
     std::string name_of_variable_first_cycle = (std::string("Fx") + std::to_string(first.edges[i].start.number) + std::to_string(first.edges[i].end.number));
     SCIP_CALL(SCIPcreateVarBasic(scip, &first.edges[i].var, name_of_variable_first_cycle.c_str(), 0.0, 1.0, 0.0, SCIP_VARTYPE_BINARY));
     SCIP_CALL(SCIPaddVar(scip, first.edges[i].var));
-  
+
+    // Add first edge to the array of all edges
+    sb_push(all_edges, first.edges[i]);
+
     std::string name_of_variable_second_cycle = (std::string("Sx") + std::to_string(second.edges[i].start.number) + std::to_string(second.edges[i].end.number));
     SCIP_CALL(SCIPcreateVarBasic(scip, &second.edges[i].var, name_of_variable_second_cycle.c_str(), 0.0, 1.0, 0.0, SCIP_VARTYPE_BINARY));
     SCIP_CALL(SCIPaddVar(scip, second.edges[i].var));
+  
+    // Add second edge to the array of all edges
+    sb_push(all_edges, second.edges[i]);
   }
 
-  // Create (1) constraint
+  // Add (1) constraint
   SCIP_CALL(add_first_constraint(scip, first, second));
 
-  // Create (2) constraint
+  // Add (2) constraint
   SCIP_CALL(add_second_constraint(scip, first, second, flags.graph_type));
 
   // Find the same edges of the cycles
-  Edge *same_edges = find_same_edges(first, second, flags.graph_type);
+  Tuple<Edge> *same_edges = find_same_edges(first, second, flags.graph_type);
 
-  // Create (3) constraint
-  SCIP_CALL(add_third_constraint(scip, first, same_edges, flags.graph_type));
+  // Add (3) constraint
+  SCIP_CALL(add_third_or_fourth_constraint(scip, first, same_edges, flags.graph_type, "Third constraint"));
 
-  SCIP_CALL(SCIPsolve(scip));
+  // Add (4) constraint
+  SCIP_CALL(add_third_or_fourth_constraint(scip, second, same_edges, flags.graph_type, "Fourth constraint"));
+  
+  // Add (7) constraint
+  SCIP_CALL(add_seventh_constraint(scip, same_edges));
+
+  Edge *z_graph = NULL;
+  Edge *w_graph = NULL;
+
+  do {
+    // Solve problem
+    SCIP_CALL(SCIPsolve(scip));
+  
+    // Print solution on the current step
+    if (SCIPgetNSols(scip) > 0) {
+      SCIPinfoMessage(scip, NULL, "\nSolution:\n");
+      SCIP_CALL(SCIPprintSol(scip, SCIPgetBestSol(scip), NULL, TRUE));
+    }
+
+    // Analyze solution vector and separate edges to Z and W cycles
+    SCIP_PROB *original_problem = scip->origprob;
+    for (int i = 0; i < original_problem->nvars; i++) {
+      SCIP_Real variable_value = SCIPsolGetVal(SCIPgetBestSol(scip), scip->set, scip->stat, original_problem->vars[i]);
+
+      Edge edge = all_edges[i];
+      if (fabs(variable_value - 1.0) < EPSILON) {
+        // Variable value is 1.0 so the variable goes to Z cycle
+        sb_push(z_graph, edge);
+      } else {
+        // Variable value is 0.0 so the variable goes to W cycle
+        sb_push(w_graph, edge);
+      }
+    }
+
+    // Free transformed problem in order to add new constraint to the problem
+    SCIPfreeTransform(scip);
+
+    if (cycles_are_new_decomposition(scip, z_graph, w_graph, same_edges)) {
+      // Found new decomposition
+      break;
+    }
+
+    sb_free(z_graph);
+    sb_free(w_graph);
+  } while(true);
 
   restoreConsole();
 }

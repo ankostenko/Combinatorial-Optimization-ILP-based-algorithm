@@ -12,6 +12,12 @@ struct Edge {
   Vertex end;
 
   SCIP_VAR *var;
+  bool available;
+};
+
+template<typename T> struct Tuple {
+  T first;
+  T second;
 };
 
 struct Graph {
@@ -34,3 +40,6 @@ struct Graph {
     sb_push(verticies, vert);
   }
 };
+
+bool are_edges_the_same_undirected_graphs(Edge edge1, Edge edge2);
+bool are_edges_the_same_directed_graphs(Edge edge1, Edge edge2);

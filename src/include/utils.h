@@ -26,3 +26,5 @@ void set_text_red();
 void set_text_yellow();
 void set_text_green();
 void reset_text_color();
+
+#define EPSILON 1e-06
