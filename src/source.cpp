@@ -13,7 +13,7 @@
 #include "scip/scip.h"
 #include "scip/scipdefplugins.h"
 
-bool are_edges_the_same_undirectional_graphs(Edge edge1, Edge edge2) {
+bool are_edges_the_same_undirected_graphs(Edge edge1, Edge edge2) {
   return ((edge1.start.number == edge2.start.number) && (edge1.end.number == edge2.end.number)) || 
          ((edge1.start.number == edge2.end.number) && (edge1.end.number == edge2.start.number));
 }
@@ -21,8 +21,8 @@ bool are_edges_the_same_undirectional_graphs(Edge edge1, Edge edge2) {
 /// Compare two edges for equality
 /// @param edge1 first edge
 /// @param edge2 second edge
-/// @return bool whether edges are equal
-bool are_edges_the_same_directional_graphs(Edge edge1, Edge edge2) {
+/// @return true if edges are equal false otherwise
+bool are_edges_the_same_directed_graphs(Edge edge1, Edge edge2) {
   return (edge1.start.number == edge2.start.number) && (edge1.end.number == edge2.end.number);
 }
 
@@ -65,7 +65,7 @@ SCIP_RETCODE add_first_constraint(SCIP *scip, Graph first, Graph second) {
 
 /// Add second constraint to the problem
 SCIP_RETCODE add_second_constraint(SCIP *scip, Graph first, Graph second, TypeOfGraph graph_type) {
-  if (graph_type == DIRECTED) {
+  if (graph_type == TypeOfGraph::DIRECTED) {
     // Branch for directed graph
     for (size_t i = 0; i < first.number_of_edges(); i++) {
       size_t first_cycle_edge_index = i;
@@ -167,6 +167,47 @@ SCIP_RETCODE add_second_constraint(SCIP *scip, Graph first, Graph second, TypeOf
   return SCIP_OKAY;
 }
 
+/// Find same edges
+/// @param first First cycle
+/// @param second Second cycle
+/// @param graph_type Type of graph
+/// @return Array of same edges for both cycles
+Edge *find_same_edges(Graph first, Graph second, TypeOfGraph graph_type) {
+  Edge *same_edges = NULL;
+  
+  if (graph_type == TypeOfGraph::DIRECTED) {
+    for (size_t i = 0; i < first.number_of_edges(); i++) {
+      Edge first_cycle_edge = first.edges[i];
+      for (size_t j = 0; j < second.number_of_edges(); j++) {
+        Edge second_cycle_edge = second.edges[j];
+
+        // Check edges for equality
+        if (are_edges_the_same_directed_graphs(first_cycle_edge, second_cycle_edge)) {
+          sb_push(same_edges, first_cycle_edge);
+          break;
+        }
+      }
+    }
+  } else if (graph_type == TypeOfGraph::UNDIRECTED) {
+    for (size_t i = 0; i < first.number_of_edges(); i++) {
+      Edge first_cycle_edge = first.edges[i];
+      for (size_t j = 0; j < second.number_of_edges(); j++) {
+        Edge second_cycle_edge = second.edges[j];
+
+        // Check edges for equality
+        if (are_edges_the_same_undirected_graphs(first_cycle_edge, second_cycle_edge)) {
+          sb_push(same_edges, first_cycle_edge);
+          break;
+        }
+      }
+    }
+  } else {
+    assert(0 && !"Unknown type of graph");
+  }
+
+  return same_edges;
+}
+
 /// Initialize SCIP
 /// @param scip SCIP varable holding problem formulation
 /// @return SCIP_RETCODE
@@ -213,7 +254,7 @@ int main(int argc, char **argv) {
     SCIP_CALL(SCIPcreateVarBasic(scip, &first.edges[i].var, name_of_variable_first_cycle.c_str(), 0.0, 1.0, 0.0, SCIP_VARTYPE_BINARY));
     SCIP_CALL(SCIPaddVar(scip, first.edges[i].var));
   
-    std::string name_of_variable_second_cycle = (std::string("Sx") + std::to_string(second.edges[i].start.number) + std::to_string(first.edges[i].end.number));
+    std::string name_of_variable_second_cycle = (std::string("Sx") + std::to_string(second.edges[i].start.number) + std::to_string(second.edges[i].end.number));
     SCIP_CALL(SCIPcreateVarBasic(scip, &second.edges[i].var, name_of_variable_second_cycle.c_str(), 0.0, 1.0, 0.0, SCIP_VARTYPE_BINARY));
     SCIP_CALL(SCIPaddVar(scip, second.edges[i].var));
   }
@@ -223,6 +264,9 @@ int main(int argc, char **argv) {
 
   // Create (2) constraint
   SCIP_CALL(add_second_constraint(scip, first, second, flags.graph_type));
+
+  // Find the same edges of the cycles
+  Edge *same_edges = find_same_edges(first, second, flags.graph_type);
 
   SCIP_CALL(SCIPsolve(scip));
 
