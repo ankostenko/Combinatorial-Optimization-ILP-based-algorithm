@@ -1,7 +1,7 @@
 @echo off
 @REM -fsanitize=address -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls
 
-set src=./src/source.cpp ./src/utils.cpp ./src/config_param_parsing.cpp ./src/win_console_colors.cpp ./src/cycle_extraction.cpp
+set src=./src/source.cpp ./src/utils.cpp ./src/config_param_parsing.cpp ./src/win_console_colors.cpp ./src/cycle_extraction.cpp ./src/print/printing.cpp
 set output=./bin/ham.exe
 set arguments=-Wall -pedantic -Wextra -O0 -g
 set libraries=-lkernel32 -L./external/ -llibscip -lsoplex
