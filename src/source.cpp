@@ -9,6 +9,7 @@
 #include "win_console_color.h"
 #include "graph.h"
 #include "cycle_extraction.h"
+#include "print/printing.h"
 
 #include "scip/scip.h"
 #include "scip/scipdefplugins.h"
@@ -167,6 +168,63 @@ SCIP_RETCODE add_second_constraint(SCIP *scip, Graph first, Graph second, TypeOf
   return SCIP_OKAY;
 }
 
+/// Check whether edge contains inside the edges array
+/// @param edges Array of edges to look in
+/// @param edge Edge to compare with
+/// @param graph_type Type of graph
+/// @return Returns true if edge contains in the array, otherwise returns false
+bool is_edge_contains_in(Edge *edges, Edge edge, TypeOfGraph graph_type) {
+  if (graph_type == TypeOfGraph::DIRECTED) {
+    for (int i = 0; i < sb_count(edges); i++) {
+      if (are_edges_the_same_directed_graphs(edges[i], edge)) {
+        return true;
+      }
+    }
+  } else if (graph_type == TypeOfGraph::UNDIRECTED) {
+    for (int i = 0; i < sb_count(edges); i++) {
+      if (are_edges_the_same_undirected_graphs(edges[i], edge)) {
+        return true;
+      }
+    }
+  } else {
+    assert(0 && !"Unknown type of graph");
+  }
+
+  return false;
+}
+
+SCIP_RETCODE add_third_constraint(SCIP *scip, Graph graph, Edge *same_edges, TypeOfGraph graph_type) {
+  SCIP_CONS *constraint = NULL;
+  SCIP_VAR **constraint_variables = NULL;
+
+  int number_of_verticies = graph.number_of_verticies();
+
+  for (size_t i = 0; i < graph.number_of_edges(); i++) {
+    Edge edge = graph.edges[i];
+    // If edge is not in the same_edges array
+    if (is_edge_contains_in(same_edges, edge, graph_type) == false) {
+      sb_push(constraint_variables, edge.var);
+    }
+  }
+
+  assert((number_of_verticies - sb_count(same_edges)) == sb_count(constraint_variables));
+
+  double *values = { };
+  for (int i = 0; i < sb_count(constraint_variables); i++) {
+    sb_push(values, 1.0);
+  }
+
+
+  SCIP_CALL(SCIPcreateConsBasicLinear(scip, &constraint, "Third constraint", 
+      sb_count(constraint_variables), constraint_variables, values, -SCIPinfinity(scip), number_of_verticies - sb_count(same_edges) - 2));
+  SCIP_CALL(SCIPaddCons(scip, constraint));
+  SCIP_CALL(SCIPprintCons(scip, constraint, NULL));
+
+  SCIP_CALL(SCIPreleaseCons(scip, &constraint));
+
+  return SCIP_OKAY;
+}
+
 /// Find same edges
 /// @param first First cycle
 /// @param second Second cycle
@@ -227,7 +285,7 @@ int main(int argc, char **argv) {
   // Load configuration file into the program
   ConfigFlags flags = load_config_file(argc, argv);
 
-  const char *path_to_the_file = "test_cases\\test_6_undir.txt";
+  const char *path_to_the_file = "test_cases\\test_6_undir_paper.txt";
 
   FILE *file = NULL;
   int error_code = fopen_s(&file, path_to_the_file, "r");
@@ -267,6 +325,9 @@ int main(int argc, char **argv) {
 
   // Find the same edges of the cycles
   Edge *same_edges = find_same_edges(first, second, flags.graph_type);
+
+  // Create (3) constraint
+  SCIP_CALL(add_third_constraint(scip, first, same_edges, flags.graph_type));
 
   SCIP_CALL(SCIPsolve(scip));
 
