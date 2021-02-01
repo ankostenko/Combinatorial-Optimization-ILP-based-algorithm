@@ -304,33 +304,85 @@ SCIP_RETCODE add_seventh_constraint(SCIP *scip, Tuple<Edge> *same_edges) {
 
 /// Find cycle
 /// Returns newly allocated cycle.
-Edge* find_cycle(Edge *graph) {
+Edge* find_cycle(Edge *graph, TypeOfGraph graph_type) {
   Edge *cycle = NULL;
-  for (int i = 0; i < sb_count(graph); i++) {
-    Edge edge = graph[i];
-    if (edge.available == false) { continue; }
+  
+  if (graph_type == TypeOfGraph::UNDIRECTED) {
+    // Branch for undirected graphs
+    for (int i = 0; i < sb_count(graph); i++) {
+      Edge current_edge = graph[i];
+      if (current_edge.visited == true) { continue; }
+      current_edge.visited = true;
 
-    for (int j = i; j < sb_count(graph); j++) {
-      int edge_index = (j + 1 == sb_count(graph)) ? 0 : j + 1;
-      Edge next_edge = graph[edge_index];
+      for (int j = i; j < sb_count(graph); j++) {
+        int edge_index = (j + 1 == sb_count(graph)) ? 0 : j + 1;
+        Edge next_edge = graph[edge_index];
+  
+        if (next_edge.visited == true) { continue; }
 
-      
+        if (edges_conjuncted_directed_graphs(current_edge, next_edge)) {
+          // Edges are conjuncted so we add them to the cycle
+          sb_push(cycle, next_edge);
+          current_edge = next_edge;
+          current_edge.visited = true;
+          j = i;
+        }    
+      }
     }
+  } else if (graph_type == TypeOfGraph::DIRECTED) {
+    // Branch for directed graphs
+        // Branch for undirected graphs
+    for (int i = 0; i < sb_count(graph); i++) {
+      Edge current_edge = graph[i];
+      if (current_edge.visited == true) { continue; }
+      current_edge.visited = true;
+
+      for (int j = i; j < sb_count(graph); j++) {
+        int edge_index = (j + 1 == sb_count(graph)) ? 0 : j + 1;
+        Edge next_edge = graph[edge_index];
+  
+        if (next_edge.visited == true) { continue; }
+
+        if (edges_conjuncted_undirected_graphs(current_edge, next_edge)) {
+          // Edges are conjuncted so we add them to the cycle
+          sb_push(cycle, next_edge);
+          current_edge = next_edge;
+          current_edge.visited = true;
+          j = i;
+        }    
+      }
+    }
+  } else {
+    assert(0 && !"We have only two types of graphs");
   }
+
+  return cycle;
 }
 
 /// Find components of a graph and add them to constraints of the problem
 /// @param graph Graph to find 
 /// @return Return true if found cycle is hamilton cycle of the graph, false otherwise
-bool find_cycles_and_add_to_constraints(SCIP *scip, Edge *graph, Tuple<Edge> *same_edges) {
+bool find_cycles_and_add_to_constraints(SCIP *scip, Edge *graph, Tuple<Edge> *same_edges, TypeOfGraph graph_type) {
   // Try to find cycles until all edges are not available
   while (true) {
-    Edge *current_cycle = find_cycle(graph);
+    Edge *current_cycle = find_cycle(graph, graph_type);
+
+    if (current_cycle == NULL) {
+      return false;
+    }
+
+    // Iterate over the current cycle and add this cycle
+    // to the constraints
+    SCIP_CONS *constraint = NULL;
+    SCIP_VAR *variables = NULL;    
 
     // Current cycle is Hamilton cycle
     if (sb_count(current_cycle) == sb_count(graph)) {
       return true;
     }
+
+    // Free current cycle
+    sb_free(current_cycle);
   }
 
   return false;
@@ -338,9 +390,9 @@ bool find_cycles_and_add_to_constraints(SCIP *scip, Edge *graph, Tuple<Edge> *sa
 
 /// Analyzes Z-graph and W-graph 
 /// @return If Z-graph and W-graph are new Hamilton Decomposition return true otherwise false
-bool cycles_are_new_decomposition(SCIP *scip, Edge *z_graph, Edge *w_graph, Tuple<Edge> *same_edges) {
-  bool z_graph_is_complete_cycle = false;
-  bool w_graph_is_complete_cycle = false;
+bool cycles_are_new_decomposition(SCIP *scip, Edge *z_graph, Edge *w_graph, Tuple<Edge> *same_edges, TypeOfGraph graph_type) {
+  bool z_graph_is_complete_cycle = find_cycles_and_add_to_constraints(scip, z_graph, same_edges, graph_type);
+  bool w_graph_is_complete_cycle = find_cycles_and_add_to_constraints(scip, w_graph, same_edges, graph_type);
   
   return z_graph_is_complete_cycle && w_graph_is_complete_cycle;
 }
@@ -452,7 +504,7 @@ int main(int argc, char **argv) {
     // Free transformed problem in order to add new constraint to the problem
     SCIPfreeTransform(scip);
 
-    if (cycles_are_new_decomposition(scip, z_graph, w_graph, same_edges)) {
+    if (cycles_are_new_decomposition(scip, z_graph, w_graph, same_edges, flags.graph_type)) {
       // Found new decomposition
       break;
     }

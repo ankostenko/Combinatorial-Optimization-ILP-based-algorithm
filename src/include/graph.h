@@ -12,7 +12,7 @@ struct Edge {
   Vertex end;
 
   SCIP_VAR *var;
-  bool available;
+  bool visited;
 };
 
 template<typename T> struct Tuple {
@@ -43,3 +43,5 @@ struct Graph {
 
 bool are_edges_the_same_undirected_graphs(Edge edge1, Edge edge2);
 bool are_edges_the_same_directed_graphs(Edge edge1, Edge edge2);
+bool edges_conjuncted_directed_graphs(Edge main_edge, Edge compare_to);
+bool edges_conjuncted_undirected_graphs(Edge main_edge, Edge compare_to);
