@@ -10,7 +10,7 @@ void print_cycle_edges(Graph graph) {
 
 void print_edges(Edge *edges) {
   for (int i = 0; i < sb_count(edges); i++) {
-    printf("%d-%d ", edges[i].start.number, edges[i].end.number);
+    printf("%d %d\n", edges[i].start.number, edges[i].end.number);
   }
   printf("\n");
 

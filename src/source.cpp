@@ -307,54 +307,39 @@ SCIP_RETCODE add_seventh_constraint(SCIP *scip, Tuple<Edge> *same_edges) {
 Edge* find_cycle(Edge *graph, TypeOfGraph graph_type) {
   Edge *cycle = NULL;
   
-  if (graph_type == TypeOfGraph::UNDIRECTED) {
-    // Branch for undirected graphs
-    for (int i = 0; i < sb_count(graph); i++) {
-      Edge current_edge = graph[i];
-      if (current_edge.visited == true) { continue; }
-      current_edge.visited = true;
+  // Branch for undirected graphs
+  for (int i = 0; i < sb_count(graph); i++) {
+    Edge *current_edge = &graph[i];
+    if (current_edge->visited == true) { continue; }
+    current_edge->visited = true;
+    sb_push(cycle, *current_edge);
 
-      for (int j = i; j < sb_count(graph); j++) {
-        int edge_index = (j + 1 == sb_count(graph)) ? 0 : j + 1;
-        Edge next_edge = graph[edge_index];
-  
-        if (next_edge.visited == true) { continue; }
+    for (int j = i; j < sb_count(graph); j++) {
+      int edge_index = (j + 1 == sb_count(graph)) ? 0 : j + 1;
+      Edge *next_edge = &graph[edge_index];
 
-        if (edges_conjuncted_directed_graphs(current_edge, next_edge)) {
+      if (next_edge->visited == true) { continue; }
+      
+      if (graph_type == TypeOfGraph::UNDIRECTED) {
+        if (edges_conjunct_undirected_graphs(*current_edge, *next_edge)) {
           // Edges are conjuncted so we add them to the cycle
-          sb_push(cycle, next_edge);
+          sb_push(cycle, *next_edge);
           current_edge = next_edge;
-          current_edge.visited = true;
+          current_edge->visited = true;
           j = i;
-        }    
+        }
+      } else {
+        if (edges_conjunct_directed_graphs(*current_edge, *next_edge)) {
+          // Edges are conjuncted so we add them to the cycle
+          sb_push(cycle, *next_edge);
+          current_edge = next_edge;
+          current_edge->visited = true;
+          j = i;
+        }
       }
     }
-  } else if (graph_type == TypeOfGraph::DIRECTED) {
-    // Branch for directed graphs
-        // Branch for undirected graphs
-    for (int i = 0; i < sb_count(graph); i++) {
-      Edge current_edge = graph[i];
-      if (current_edge.visited == true) { continue; }
-      current_edge.visited = true;
-
-      for (int j = i; j < sb_count(graph); j++) {
-        int edge_index = (j + 1 == sb_count(graph)) ? 0 : j + 1;
-        Edge next_edge = graph[edge_index];
-  
-        if (next_edge.visited == true) { continue; }
-
-        if (edges_conjuncted_undirected_graphs(current_edge, next_edge)) {
-          // Edges are conjuncted so we add them to the cycle
-          sb_push(cycle, next_edge);
-          current_edge = next_edge;
-          current_edge.visited = true;
-          j = i;
-        }    
-      }
-    }
-  } else {
-    assert(0 && !"We have only two types of graphs");
   }
+  
 
   return cycle;
 }
@@ -374,15 +359,83 @@ bool find_cycles_and_add_to_constraints(SCIP *scip, Edge *graph, Tuple<Edge> *sa
     // Iterate over the current cycle and add this cycle
     // to the constraints
     SCIP_CONS *constraint = NULL;
-    SCIP_VAR *variables = NULL;    
+    SCIP_VAR **variables = NULL;    
 
+    // Count number of verticies which is at this point equal to 
+    // the number of edges
+    int number_of_verticies_in_cycle = sb_count(current_cycle);
+
+    // Add doubled edges to the current cycle
+    for (int same_edges_index = 0; same_edges_index < sb_count(same_edges); same_edges_index++) {
+      Tuple<Edge> edges = same_edges[same_edges_index];
+      for (int current_edge_index = 0; sb_count(current_cycle); current_edge_index++) {
+        Edge current_cycle_edge = current_cycle[current_edge_index];
+        if (graph_type == TypeOfGraph::DIRECTED) {
+          // Branch for directed graphs
+          if (are_edges_the_same_directed_graphs(edges.first, current_cycle_edge)) {
+            if (current_cycle_edge.var == edges.first.var) {
+              sb_push(current_cycle, edges.second);
+            } else {
+              sb_push(current_cycle, edges.first);
+            }
+            break;  
+          }
+        } else {
+          // Branch for undirected graphs
+          if (are_edges_the_same_undirected_graphs(edges.first, current_cycle_edge)) {
+            if (current_cycle_edge.var == edges.first.var) {
+              sb_push(current_cycle, edges.second);
+            } else {
+              sb_push(current_cycle, edges.first);
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    // Add variables to the constraints
+    for (int i = 0; i < sb_count(current_cycle); i++) {
+      sb_push(variables, current_cycle[i].var);
+    }
+
+    // Set values for the variables
+    double* values = (double*)allocate_and_zero(sb_count(variables) * sizeof(double));
+    memset(values, 1.0, sb_count(variables));
+
+    // Constraint with less
+    SCIP_CALL(SCIPcreateConsBasicLinear(scip, &constraint, "Constraint Less", 
+              sb_count(variables), variables, values, -SCIPinfinity(scip), number_of_verticies_in_cycle - 1));
+    SCIP_CALL(SCIPaddCons(scip, constraint));
+
+    // TODO: remove
+    SCIP_CALL(SCIPprintCons(scip, constraint, NULL));
+    SCIPinfoMessage(scip, NULL,  "\n");
+
+    SCIP_CALL(SCIPreleaseCons(scip, &constraint));
+
+    // Constraint with greater
+    SCIP_CALL(SCIPcreateConsBasicLinear(scip, &constraint, "Constraint Greater", 
+              sb_count(variables), variables, values, -SCIPinfinity(scip), sb_count(current_cycle) - number_of_verticies_in_cycle + 1));
+    SCIP_CALL(SCIPaddCons(scip, constraint));
+
+    // TODO: remove
+    SCIP_CALL(SCIPprintCons(scip, constraint, NULL));
+    SCIPinfoMessage(scip, NULL,  "\n");
+
+    SCIP_CALL(SCIPreleaseCons(scip, &constraint));
+    
     // Current cycle is Hamilton cycle
-    if (sb_count(current_cycle) == sb_count(graph)) {
+    if (number_of_verticies_in_cycle == sb_count(graph)) {
+      sb_free(current_cycle);
+      sb_free(variables);
+      deallocate_and_null((void**)&values);
       return true;
     }
 
-    // Free current cycle
     sb_free(current_cycle);
+    sb_free(variables);
+    deallocate_and_null((void**)&values);
   }
 
   return false;
@@ -394,7 +447,16 @@ bool cycles_are_new_decomposition(SCIP *scip, Edge *z_graph, Edge *w_graph, Tupl
   bool z_graph_is_complete_cycle = find_cycles_and_add_to_constraints(scip, z_graph, same_edges, graph_type);
   bool w_graph_is_complete_cycle = find_cycles_and_add_to_constraints(scip, w_graph, same_edges, graph_type);
   
-  return z_graph_is_complete_cycle && w_graph_is_complete_cycle;
+  if (z_graph_is_complete_cycle && w_graph_is_complete_cycle) {
+    set_text_green();
+    printf("Found new Hamilton decomposition\n");
+    reset_text_color();
+    print_edges(z_graph);
+    print_edges(w_graph);
+    return true;
+  } else {
+    return false;
+  }
 }
 
 /// Initialize SCIP
@@ -416,7 +478,7 @@ int main(int argc, char **argv) {
   // Load configuration file into the program
   ConfigFlags flags = load_config_file(argc, argv);
 
-  const char *path_to_the_file = "test_cases\\test_6_undir_paper_motor.txt";
+  const char *path_to_the_file = "test_cases\\test_10_dir.txt";
 
   FILE *file = NULL;
   int error_code = fopen_s(&file, path_to_the_file, "r");
@@ -484,6 +546,10 @@ int main(int argc, char **argv) {
     if (SCIPgetNSols(scip) > 0) {
       SCIPinfoMessage(scip, NULL, "\nSolution:\n");
       SCIP_CALL(SCIPprintSol(scip, SCIPgetBestSol(scip), NULL, TRUE));
+    } else {
+      // No solution
+      printf("No new Hamilton decomposition found\n");
+      break;
     }
 
     // Analyze solution vector and separate edges to Z and W cycles
@@ -503,6 +569,11 @@ int main(int argc, char **argv) {
 
     // Free transformed problem in order to add new constraint to the problem
     SCIPfreeTransform(scip);
+
+    printf("Z-cycle: \n");
+    print_edges(z_graph);
+    printf("W-cycle: \n");
+    print_edges(w_graph);
 
     if (cycles_are_new_decomposition(scip, z_graph, w_graph, same_edges, flags.graph_type)) {
       // Found new decomposition
