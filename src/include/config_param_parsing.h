@@ -3,14 +3,11 @@
 #include <assert.h>
 #include <inttypes.h>
 #include "utils.h"
-
-enum TypeOfGraph {
-  DIRECTED, 
-  UNDIRECTED
-};
+#include "graph.h"
 
 struct ConfigFlags {
   TypeOfGraph graph_type;
+  const char *path_to_test_file;
 };
 
 /// Struct stores information about configuration parameter

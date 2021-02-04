@@ -3,6 +3,11 @@
 #include "stretchy_buffer.h"
 #include "scip/scip.h"
 
+enum TypeOfGraph {
+  DIRECTED, 
+  UNDIRECTED
+};
+
 struct Vertex {
   int number;
 };
@@ -45,3 +50,5 @@ bool are_edges_the_same_undirected_graphs(Edge edge1, Edge edge2);
 bool are_edges_the_same_directed_graphs(Edge edge1, Edge edge2);
 bool edges_conjunct_directed_graphs(Edge main_edge, Edge compare_to);
 bool edges_conjunct_undirected_graphs(Edge main_edge, Edge compare_to);
+Tuple<Edge> *find_same_edges(Graph first, Graph second, TypeOfGraph graph_type);
+Edge* find_cycle(Edge *graph, TypeOfGraph graph_type);

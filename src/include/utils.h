@@ -3,6 +3,8 @@
 #include <inttypes.h>
 #include <stdio.h>
 
+#include "graph.h"
+
 bool str_compare(const char *str_1, const char *str_2);
 bool null_report_problem_and_optionally_exit(void *ptr, bool should_exit, const char* name_of_function, const char *msg);
 bool error_occurred_report_problem_and_optionally_exit(bool error_occurred, bool should_exit, const char* name_of_function, const char *msg);
@@ -13,6 +15,7 @@ void* allocate_and_zero(size_t len);
 void deallocate_and_null(void** ptr);
 char* trim_non_alphanumeric_start_end(const char *line);
 size_t get_size_of_file(FILE *file_stream);
+bool is_edge_contains_in(Tuple<Edge> *edges, Edge edge, TypeOfGraph graph_type);
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"

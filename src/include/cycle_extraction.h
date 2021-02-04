@@ -7,5 +7,4 @@ struct BundleOfGraphs {
   Graph second;
 };
 
-BundleOfGraphs read_cycles_from_stream(FILE* stream, size_t total_size_of_stream);
-BundleOfGraphs read_cycles_from_stream(FILE* stream, size_t total_size_of_stream);
+bool read_cycles_from_stream(BundleOfGraphs *bundle, FILE* stream, size_t total_size_of_stream);

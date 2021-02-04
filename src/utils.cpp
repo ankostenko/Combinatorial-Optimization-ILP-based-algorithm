@@ -96,7 +96,7 @@ char* trim_non_alphanumeric_start_end(const char *line) {
   // Add to the new line only alphanumeric characters
   for (size_t orig_i = 0, res_i = 0; orig_i < len; orig_i++) {
     uint8_t ch = line[orig_i];
-    if (isalnum(ch) || ch == '=' || ch == '\0') {
+    if (isalnum(ch) || ch == '=' || ch == '\0' || ch == '_' || ch == '-' || ch == '.' || ch == '/' || ch == '\\') {
       trimmed_line[res_i] = ch;
       res_i++;
     }

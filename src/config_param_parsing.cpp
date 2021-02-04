@@ -79,6 +79,7 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
 
   // Configuration parameters
   TypeOfGraph type_of_graph = DIRECTED;
+  char *path_to_test_file = NULL;
 
   // Number of line to report in case of an error
   uint32_t number_of_line = 1;
@@ -99,9 +100,13 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
         printf("Type of graph: directed\n");
         report_unknown_parameter_value(param.config_param_name, param.config_param_value, number_of_line);
       }
+    } else if (str_compare(param.config_param_name, "test_file")) {
+      path_to_test_file = (char*)allocate_and_zero(strlen(param.config_param_value) + 1);
+      memcpy(path_to_test_file, param.config_param_value, strlen(param.config_param_value) + 1);
     } else {
       // Unkown type of parameter
       report_unknown_parameter(param.config_param_name, number_of_line);
+      exit(0);
     }
 
     // Free memory
@@ -116,6 +121,7 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
   deallocate_and_null((void**)&line_buffer);
 
   return ConfigFlags({ 
-    .graph_type = type_of_graph 
+    type_of_graph,
+    path_to_test_file,
   });
 }
