@@ -2,6 +2,10 @@
   "files.associations": {
     "string": "cpp",
     "random": "cpp",
-    "tuple": "cpp"
+    "tuple": "cpp",
+    "vector": "cpp",
+    "deque": "cpp",
+    "list": "cpp",
+    "xstring": "cpp"
   }
 }

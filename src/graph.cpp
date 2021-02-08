@@ -136,3 +136,46 @@ Tuple<Edge> *find_same_edges(Graph first, Graph second, TypeOfGraph graph_type) 
 
   return same_edges;
 }
+
+/// Check if edge contains in 'edges' array
+bool contains_edge(Edge edge, Edge *edges, TypeOfGraph graph_type) {
+  for (int i = 0; i < sb_count(edges); i++) {
+    if (TypeOfGraph::DIRECTED == graph_type) {
+      if (are_edges_the_same_directed_graphs(edges[i], edge)) {
+        return true;
+      }
+    } else {
+      if (are_edges_the_same_undirected_graphs(edges[i], edge)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+bool verticies_constain_vertex(Vertex vert, std::vector<Vertex> verticies) {
+  for (Vertex v: verticies) {
+    if (v.number == vert.number || v.number == vert.number) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// Calculate degree of vertex of graph Z
+/// @param vertex_index Index of vertex
+/// @param multigraph List of adjacency of both both W and Z
+/// @return Degree of a given vertex
+int degree_of_vertex_in_multigraph(int vertex_index, std::vector<std::vector<Edge>> &multigraph) {
+  std::vector<Edge> &vec = multigraph[vertex_index];
+  int degree_of_vertex = 0;
+  for (Edge e: vec) {
+    if (e.graph_name == GraphName::Z_GRAPH) {
+      degree_of_vertex++;
+    }
+  }
+
+  return degree_of_vertex;
+}

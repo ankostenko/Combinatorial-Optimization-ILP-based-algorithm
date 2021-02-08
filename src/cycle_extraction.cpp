@@ -28,9 +28,9 @@ Graph create_edges_from_verticies(Graph *graph) {
   for (size_t i = 0; i < graph->number_of_verticies(); i++) {
     // If we iterated to the last vertex
     if (i + 1 == graph->number_of_verticies()) {
-      graph->add_edge(Edge{ graph->verticies[i], graph->verticies[0], NULL, false });
+      graph->add_edge(Edge{ .start = graph->verticies[i], .end = graph->verticies[0] });
     } else {
-      graph->add_edge(Edge{ graph->verticies[i], graph->verticies[i + 1], NULL, false });
+      graph->add_edge(Edge{ .start = graph->verticies[i], .end = graph->verticies[i + 1] });
     }
   }
   return *graph;

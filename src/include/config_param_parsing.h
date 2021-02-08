@@ -8,6 +8,8 @@
 struct ConfigFlags {
   TypeOfGraph graph_type;
   const char *path_to_test_file;
+  bool first_neighborhood;
+  bool second_neighborhood;
 };
 
 /// Struct stores information about configuration parameter

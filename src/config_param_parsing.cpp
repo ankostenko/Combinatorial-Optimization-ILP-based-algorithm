@@ -121,7 +121,7 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
   deallocate_and_null((void**)&line_buffer);
 
   return ConfigFlags({ 
-    type_of_graph,
-    path_to_test_file,
+    .graph_type = type_of_graph,
+    .path_to_test_file = path_to_test_file,
   });
 }
