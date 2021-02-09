@@ -154,22 +154,12 @@ bool contains_edge(Edge edge, Edge *edges, TypeOfGraph graph_type) {
   return false;
 }
 
-bool verticies_constain_vertex(Vertex vert, std::vector<Vertex> verticies) {
-  for (Vertex v: verticies) {
-    if (v.number == vert.number || v.number == vert.number) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 /// Calculate degree of vertex of graph Z
 /// @param vertex_index Index of vertex
 /// @param multigraph List of adjacency of both both W and Z
 /// @return Degree of a given vertex
 int degree_of_vertex_in_multigraph(int vertex_index, std::vector<std::vector<Edge>> &multigraph) {
-  std::vector<Edge> &vec = multigraph[vertex_index];
+  std::vector<Edge> &vec = multigraph[vertex_index - 1];
   int degree_of_vertex = 0;
   for (Edge e: vec) {
     if (e.graph_name == GraphName::Z_GRAPH) {
@@ -178,4 +168,86 @@ int degree_of_vertex_in_multigraph(int vertex_index, std::vector<std::vector<Edg
   }
 
   return degree_of_vertex;
+}
+
+/// Fix edge in multigraph and set in which graph it goes
+void visit_edge_in_multigraph(std::vector<std::vector<Edge>> &multigraph, Edge edge, TypeOfGraph graph_type) {
+  std::vector<Edge> &start_vector = multigraph[edge.start.number - 1];
+  std::vector<Edge> &end_vector = multigraph[edge.end.number - 1];
+
+  for (Edge &e : start_vector) {
+    if (TypeOfGraph::DIRECTED == graph_type) {
+      if (are_edges_the_same_directed_graphs(e, edge)) {
+        e.visited = true;
+      }
+    } else {
+      if (are_edges_the_same_undirected_graphs(e, edge)) {
+        e.visited = true;
+      }
+    }
+  }
+
+  for (Edge &e: end_vector) {
+    if (TypeOfGraph::DIRECTED == graph_type) {
+      if (are_edges_the_same_directed_graphs(e, edge)) {
+        e.visited = true;
+      }
+    } else {
+      if (are_edges_the_same_undirected_graphs(e, edge)) {
+        e.visited = true;
+      }
+    }
+  }
+}
+
+
+/// Find number of cycles in given graph
+int find_number_of_cycles_in_graph_from_multigraph(std::vector<std::vector<Edge>> multigraph, GraphName graph_name, TypeOfGraph graph_type) {
+  int number_of_cycles = 0;
+  Edge current_vertex;
+  size_t i = 0;
+
+  while (true) {
+    // Find starting vertex
+    for (i = 0; i < multigraph.size(); i++){
+      std::vector<Edge> &start_vertex_array = multigraph[0];
+      Edge start_vertex = { .start = { -1 } };
+      for (Edge &e: start_vertex_array) {
+        if (e.graph_name == graph_name && e.visited == false) {
+          current_vertex = e;
+          start_vertex = e;
+          visit_edge_in_multigraph(multigraph, e, graph_type);
+          break;
+        }
+      }
+      if (start_vertex.start.number == -1) { 
+        return number_of_cycles; 
+      } else {
+        number_of_cycles += 1;
+        break;
+      }
+    }
+    
+
+    while (true) {
+      std::vector<Edge> &vec = multigraph[current_vertex.end.number - 1];
+
+      for (i = 0; i < vec.size(); i++) {
+        Edge &e = vec[i];
+        if (e.visited == true) { continue; }
+        if ((e.graph_name == graph_name) && ((e.start.number == current_vertex.end.number) || (e.end.number == current_vertex.end.number))) {
+          visit_edge_in_multigraph(multigraph, e, graph_type);
+          // Swap start and end of the edge 
+          // It should be done because if the previous edge was in another graph
+          // Orientation of edge could be different
+          if (e.end.number == current_vertex.end.number) {
+            std::swap(e.start.number, e.end.number);
+          }
+          current_vertex = e;
+          break;
+        }
+      }
+      if (i == 4) { break; }
+    }
+  }
 }

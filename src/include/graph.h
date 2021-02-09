@@ -63,5 +63,5 @@ bool edges_conjunct_undirected_graphs(Edge main_edge, Edge compare_to);
 Tuple<Edge> *find_same_edges(Graph first, Graph second, TypeOfGraph graph_type);
 Edge* find_cycle(Edge *graph, TypeOfGraph graph_type);
 bool contains_edge(Edge edge, Edge *edges, TypeOfGraph graph_type);
-bool verticies_constain_vertex(Vertex vert, std::vector<Vertex> verticies);
 int degree_of_vertex_in_multigraph(int vertex_index, std::vector<std::vector<Edge>> &multigraph);
+int find_number_of_cycles_in_graph_from_multigraph(std::vector<std::vector<Edge>> multigraph, GraphName graph_name, TypeOfGraph graph_type);

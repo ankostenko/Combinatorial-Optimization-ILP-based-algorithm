@@ -27,7 +27,10 @@
 #define SOKOL_TIME_IMPL
 #include "sokol_time.h"
 
-
+/// Add or delete vertex from broken verticies array
+/// @param edges Which adjacent edges to look in
+/// @param vertex_number Number of a given vertex
+/// @param broken_verticies Array of broken verticies
 void set_brokeness_of_verticies(std::vector<Edge> edges, int vertex_number, std::vector<int> &broken_verticies) {
   // Check if the verticies now broken
   // 1. Find degree of the vertex
@@ -56,8 +59,8 @@ void set_brokeness_of_verticies(std::vector<Edge> edges, int vertex_number, std:
 /// Fix edge in multigraph and set in which graph it goes
 void fix_edge_in_multigraph(std::vector<std::vector<Edge>> &multigraph, std::vector<int> &broken_verticies, Edge edge, 
                                                                             TypeOfGraph graph_type, GraphName graph_name) {
-  std::vector<Edge> start_vector = multigraph[edge.start.number - 1];
-  std::vector<Edge> end_vector = multigraph[edge.end.number - 1];
+  std::vector<Edge> &start_vector = multigraph[edge.start.number - 1];
+  std::vector<Edge> &end_vector = multigraph[edge.end.number - 1];
 
   for (Edge &e : start_vector) {
     if (TypeOfGraph::DIRECTED == graph_type) {
@@ -107,7 +110,9 @@ void chain_edge_fixing(Edge edge, GraphName graph_to_fix, std::vector<std::vecto
     std::vector<Edge> start_vector = multigraph[edge.start.number - 1];
     int number_of_incident_fixed_edges = 0;
     for (Edge e : start_vector) {
-      number_of_incident_fixed_edges += e.fixed;
+      if (e.graph_name == graph_to_fix) {
+        number_of_incident_fixed_edges += e.fixed;
+      }
     }
 
     if (number_of_incident_fixed_edges == 2) {
@@ -120,7 +125,9 @@ void chain_edge_fixing(Edge edge, GraphName graph_to_fix, std::vector<std::vecto
     std::vector<Edge> end_vector = multigraph[edge.end.number - 1];
     number_of_incident_fixed_edges = 0;
     for (Edge e: end_vector) {
-      number_of_incident_fixed_edges += e.fixed;
+      if (e.graph_name == graph_to_fix) {
+        number_of_incident_fixed_edges += e.fixed;
+      }
     }
 
     if (number_of_incident_fixed_edges == 2) {
@@ -132,8 +139,49 @@ void chain_edge_fixing(Edge edge, GraphName graph_to_fix, std::vector<std::vecto
   }
 }
 
+/// Fix doubled edges in multigraph
+/// @param multigraph Original multigraph
+/// @param same_edges Array of doubled edges
+/// @param graph_type Type of graph
+void fix_doubled_edges(std::vector<std::vector<Edge>> &multigraph, Tuple<Edge> *same_edges, TypeOfGraph graph_type) {
+  for (auto &vec: multigraph) {
+    for (Edge &e: vec) {
+      if (is_edge_contains_in(same_edges, e, graph_type)) {
+        e.fixed = true;
+      }
+    }
+  }
+}
+
+/// Unfix doubled edges in multigraph
+/// @param multigraph Original multigraph
+/// @param same_edges Array of doubled edges
+/// @param graph_type Type of graph
+void unfix_edges_in_multigraph(std::vector<std::vector<Edge>> &multigraph) {
+  for (auto &vec: multigraph) {
+    for (Edge &e: vec) {
+      e.fixed = false;
+    }
+  }
+}
+
 /// Local search with respect to the first neighborhood
 bool local_search_1(Edge *z_graph, Edge *w_graph, Tuple<Edge> *same_edges, int attempt_limit, TypeOfGraph graph_type) {
+  // Find number of components in graphs
+  int number_of_components_in_z_graph = 0;
+  while (true) {
+    Edge *cycle = find_cycle(z_graph, graph_type);
+    if (cycle == NULL) { break; }
+    number_of_components_in_z_graph += 1;
+  }
+
+  int number_of_components_in_w_graph = 0;
+  while (true) {
+    Edge *cycle = find_cycle(w_graph, graph_type);
+    if (cycle == NULL) { break; }
+    number_of_components_in_w_graph += 1;
+  }
+
   // Uncheck graphs
   for (int i = 0; i < sb_count(z_graph); i++) {
     z_graph[i].visited = false;
@@ -162,29 +210,18 @@ bool local_search_1(Edge *z_graph, Edge *w_graph, Tuple<Edge> *same_edges, int a
   }
 
   // Fix doubled edges
-  for (auto &vec: multigraph) {
-    for (Edge &e: vec) {
-      if (is_edge_contains_in(same_edges, e, graph_type)) {
-        e.fixed = true;
-      }
-    }
-  }
-
-  for (auto vec : multigraph) {
-    for (Edge edge : vec) {
-      printf("%d-%d ", edge.start.number, edge.end.number);
-    }
-    printf("\n");
-  }
+  fix_doubled_edges(multigraph, same_edges, graph_type);
 
   std::vector<int> z_graph_indices(sb_count(z_graph), 0); z_graph_indices.clear();
   for (int i = 0; i < sb_count(z_graph); i++) {
     z_graph_indices.push_back(i);
   }
 
+  // Initialize random devices
   std::random_device rd;
   std::mt19937 g(rd());
 
+  // Array of broken verticies
   std::vector<int> broken_verticies;
 
   while (true) {
@@ -196,24 +233,55 @@ bool local_search_1(Edge *z_graph, Edge *w_graph, Tuple<Edge> *same_edges, int a
     for (int index : z_graph_indices) {
       std::vector<Edge> z_graph_at_index = multigraph[index];
       for (Edge e: z_graph_at_index) {
-        if (e.fixed == false && e.visited == false) {
+          if (e.graph_name == GraphName::Z_GRAPH && e.fixed == false && e.visited == false) {
           chosen_edge = e;
+          goto end_search;      
         }
       }
     }
+    end_search:
+
     // 3. Break if we don't have unchecked and unfixed edges
     if (chosen_edge.start.number == -1) { break; }
 
-    chain_edge_fixing(chosen_edge, GraphName::Z_GRAPH, multigraph, broken_verticies, graph_type);
+    chain_edge_fixing(chosen_edge, GraphName::W_GRAPH, multigraph, broken_verticies, graph_type);
     for (int i = 0; i < attempt_limit; i++) {
+      // Z contains a vertex with degree not equal to 2
       while (true) {
         // We fixed all verticies can proceed to check what solution we got 
         if (broken_verticies.empty()) {
           break;
         }
 
+        // Check if there's no verticies with 3 incident fixed edges
+        for (int vertex_index: broken_verticies) {
+          std::vector<Edge> vec = multigraph[vertex_index];
+          int number_of_fixed_edges = 0;
+          // Z graph
+          for (Edge e: vec) {
+            if (e.graph_name == GraphName::Z_GRAPH) {
+              number_of_fixed_edges += 1;
+            }
+          }
+
+          // Number of fixed incident edges is three so we should stop attempt
+          if (number_of_fixed_edges == 3) { break; }
+
+          // W graph
+          number_of_fixed_edges = 0;
+          for (Edge e: vec) {
+            if (e.graph_name == GraphName::W_GRAPH) {
+              number_of_fixed_edges += 1;
+            }
+          }
+
+          // Number of fixed incident edges is three so we should stop attempt
+          if (number_of_fixed_edges == 3) { break; }
+        }
+
         // Check degree of vertex
         if (degree_of_vertex_in_multigraph(chosen_edge.start.number, multigraph) == 1) {
+          printf("Degree 1\n");
           // Degree of vertex is equal to 1
           switch(1) {
             case 1: {
@@ -221,14 +289,50 @@ bool local_search_1(Edge *z_graph, Edge *w_graph, Tuple<Edge> *same_edges, int a
               std::shuffle(edges.begin(), edges.end(), g);
               for (Edge e: edges) {
                 if (e.fixed == false) {
-                  chain_edge_fixing(e, GraphName::W_GRAPH, multigraph, broken_verticies, graph_type);
+                  chain_edge_fixing(e, GraphName::Z_GRAPH, multigraph, broken_verticies, graph_type);
+                  break;
                 }
               }
             } break;
           }
+        } else if (degree_of_vertex_in_multigraph(chosen_edge.start.number, multigraph) == 3) {
+          printf("Degree 3\n");
+          // Degree of vertex is equal to 3
+          switch(1) {
+            case 1: {
+              std::vector<Edge> edges = multigraph[chosen_edge.start.number - 1];
+              std::shuffle(edges.begin(), edges.end(), g);
+              for (Edge e: edges) {
+                if (e.fixed == false) {
+                  chain_edge_fixing(e, GraphName::W_GRAPH, multigraph, broken_verticies, graph_type);
+                  break;
+                }
+              }
+            } break;
+          }
+        } else if (degree_of_vertex_in_multigraph(chosen_edge.start.number, multigraph) == 4) {
+          return false;
+        } else if (degree_of_vertex_in_multigraph(chosen_edge.start.number, multigraph) == 0) {
+          return false;
         }
       }
+
+      // If number of components in the graphs has decreased stop attempts
+      int new_number_of_components_in_z_graph = find_number_of_cycles_in_graph_from_multigraph(multigraph, GraphName::Z_GRAPH, graph_type);
+      int new_number_of_components_in_w_graph = find_number_of_cycles_in_graph_from_multigraph(multigraph, GraphName::W_GRAPH, graph_type);
+      if (new_number_of_components_in_z_graph + new_number_of_components_in_w_graph 
+          < number_of_components_in_z_graph + number_of_components_in_w_graph) {
+        return true;
+      }
+
+      // Restore original Z and W graphs
+
+      // Unfix all edges and fix only doubled edges
+      unfix_edges_in_multigraph(multigraph);
+      fix_doubled_edges(multigraph, same_edges, graph_type);
     }
+
+    // Mark chosen edge as checked
   }
 
   return false;
@@ -298,19 +402,19 @@ int main(int argc, char **argv) {
   edge = { .start = { 7 }, .end = { 6 } };
   sb_push(z_graph, edge);
 
-  edge = { .start = { 1 }, .end = { 5 } };
-  sb_push(w_graph, edge);
-  edge = { .start = { 5 }, .end = { 6 } };
-  sb_push(w_graph, edge);
-  edge = { .start = { 6 }, .end = { 2 } };
-  sb_push(w_graph, edge);
-  edge = { .start = { 2 }, .end = { 1 } };
-  sb_push(w_graph, edge);
-  edge = { .start = { 4 }, .end = { 8 } };
+  edge = { .start = { 1 }, .end = { 8 } };
   sb_push(w_graph, edge);
   edge = { .start = { 8 }, .end = { 7 } };
   sb_push(w_graph, edge);
-  edge = { .start = { 7 }, .end = { 3 } };
+  edge = { .start = { 7 }, .end = { 2 } };
+  sb_push(w_graph, edge);
+  edge = { .start = { 2 }, .end = { 1 } };
+  sb_push(w_graph, edge);
+  edge = { .start = { 4 }, .end = { 5 } };
+  sb_push(w_graph, edge);
+  edge = { .start = { 5 }, .end = { 6 } };
+  sb_push(w_graph, edge);
+  edge = { .start = { 6 }, .end = { 3 } };
   sb_push(w_graph, edge);
   edge = { .start = { 3 }, .end = { 4 } };
   sb_push(w_graph, edge);
@@ -320,7 +424,11 @@ int main(int argc, char **argv) {
 
   Tuple<Edge> *same_edges = find_same_edges(first, second, TypeOfGraph::UNDIRECTED);
 
-  local_search_1(z_graph, w_graph, same_edges, 5, TypeOfGraph::UNDIRECTED);
+  if (local_search_1(z_graph, w_graph, same_edges, 5, TypeOfGraph::UNDIRECTED)) {
+    printf("We've got better solution!");
+  } else {
+    printf("We don't have better solution!");
+  }
 
   return 0;
 
