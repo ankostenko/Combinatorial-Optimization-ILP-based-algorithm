@@ -200,54 +200,96 @@ void visit_edge_in_multigraph(std::vector<std::vector<Edge>> &multigraph, Edge e
   }
 }
 
+/// Fix edge in multigraph and set in which graph it goes
+void visit_for_cycle_search_edge_in_multigraph(std::vector<std::vector<Edge>> &multigraph, Edge edge, TypeOfGraph graph_type) {
+  std::vector<Edge> &start_vector = multigraph[edge.start.number - 1];
+  std::vector<Edge> &end_vector = multigraph[edge.end.number - 1];
+
+  for (Edge &e : start_vector) {
+    if (TypeOfGraph::DIRECTED == graph_type) {
+      if (are_edges_the_same_directed_graphs(e, edge)) {
+        e.visited_for_cycle_search = true;
+      }
+    } else {
+      if (are_edges_the_same_undirected_graphs(e, edge)) {
+        e.visited_for_cycle_search = true;
+      }
+    }
+  }
+
+  for (Edge &e: end_vector) {
+    if (TypeOfGraph::DIRECTED == graph_type) {
+      if (are_edges_the_same_directed_graphs(e, edge)) {
+        e.visited_for_cycle_search = true;
+      }
+    } else {
+      if (are_edges_the_same_undirected_graphs(e, edge)) {
+        e.visited_for_cycle_search = true;
+      }
+    }
+  }
+}
+
 
 /// Find number of cycles in given graph
-int find_number_of_cycles_in_graph_from_multigraph(std::vector<std::vector<Edge>> multigraph, GraphName graph_name, TypeOfGraph graph_type) {
+int find_number_of_cycles_in_graph_from_multigraph(std::vector<std::vector<Edge>> &multigraph, GraphName graph_name, TypeOfGraph graph_type) {
   int number_of_cycles = 0;
-  Edge current_vertex;
+  Edge current_edge;
   size_t i = 0;
+  Edge copy_to_vector[8] = { };
+
+  // Mark every edge as not visited
+  for (std::vector<Edge> &vec: multigraph) {
+    for (Edge &e: vec) {
+      e.visited_for_cycle_search = false;
+    }
+  }
 
   while (true) {
     // Find starting vertex
-    for (i = 0; i < multigraph.size(); i++){
-      std::vector<Edge> &start_vertex_array = multigraph[0];
-      Edge start_vertex = { .start = { -1 } };
+    for (i = 0; i < multigraph.size(); i++) {
+      std::vector<Edge> &start_vertex_array = multigraph[i];
+      current_edge = { .start = { -1 } };
       for (Edge &e: start_vertex_array) {
-        if (e.graph_name == graph_name && e.visited == false) {
-          current_vertex = e;
-          start_vertex = e;
-          visit_edge_in_multigraph(multigraph, e, graph_type);
-          break;
+        if (e.graph_name == graph_name && e.visited_for_cycle_search == false) {
+          current_edge = e;
+          visit_for_cycle_search_edge_in_multigraph(multigraph, e, graph_type);
+          goto found_start_edge;
         }
-      }
-      if (start_vertex.start.number == -1) { 
-        return number_of_cycles; 
-      } else {
-        number_of_cycles += 1;
-        break;
       }
     }
-    
+    found_start_edge:
+
+    if (current_edge.start.number == -1) { 
+      return number_of_cycles; 
+    } else {
+      number_of_cycles += 1;
+    }
 
     while (true) {
-      std::vector<Edge> &vec = multigraph[current_vertex.end.number - 1];
+      auto &end_vec = multigraph[current_edge.end.number - 1];
+      for (size_t i = 0; i < end_vec.size(); i++) {
+        copy_to_vector[i] = end_vec[i];
+      }
+      auto &start_vec = multigraph[current_edge.start.number - 1];
+      for (size_t i = 0; i < start_vec.size(); i++) {
+        copy_to_vector[i + 4] = start_vec[i];
+      }
 
-      for (i = 0; i < vec.size(); i++) {
-        Edge &e = vec[i];
-        if (e.visited == true) { continue; }
-        if ((e.graph_name == graph_name) && ((e.start.number == current_vertex.end.number) || (e.end.number == current_vertex.end.number))) {
-          visit_edge_in_multigraph(multigraph, e, graph_type);
-          // Swap start and end of the edge 
-          // It should be done because if the previous edge was in another graph
-          // Orientation of edge could be different
-          if (e.end.number == current_vertex.end.number) {
-            std::swap(e.start.number, e.end.number);
+      for (i = 0; i < 8; i++) {
+        Edge &e = copy_to_vector[i];
+        if (e.visited_for_cycle_search == true) { continue; }
+        if (e.graph_name == graph_name) {
+          if (((graph_type == TypeOfGraph::UNDIRECTED) && edges_conjunct_undirected_graphs(e, current_edge))|| 
+              ((graph_type == TypeOfGraph::DIRECTED)   && edges_conjunct_directed_graphs(e, current_edge))) {
+            visit_for_cycle_search_edge_in_multigraph(multigraph, e, graph_type);
+            current_edge = e;
+            break;
           }
-          current_vertex = e;
-          break;
         }
       }
-      if (i == 4) { break; }
+
+      if (i == 8) { break; }
     }
   }
 }

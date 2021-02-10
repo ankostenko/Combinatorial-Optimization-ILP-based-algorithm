@@ -25,6 +25,7 @@ struct Edge {
 
   SCIP_VAR *var;
   bool visited;
+  bool visited_for_cycle_search;
   bool fixed;
 
   GraphName graph_name;
@@ -64,7 +65,7 @@ Tuple<Edge> *find_same_edges(Graph first, Graph second, TypeOfGraph graph_type);
 Edge* find_cycle(Edge *graph, TypeOfGraph graph_type);
 bool contains_edge(Edge edge, Edge *edges, TypeOfGraph graph_type);
 int degree_of_vertex_in_multigraph(int vertex_index, const std::vector<std::vector<Edge>> &multigraph);
-int find_number_of_cycles_in_graph_from_multigraph(std::vector<std::vector<Edge>> multigraph, GraphName graph_name, TypeOfGraph graph_type);
+int find_number_of_cycles_in_graph_from_multigraph(std::vector<std::vector<Edge>> &multigraph, GraphName graph_name, TypeOfGraph graph_type);
 void visit_edge_in_multigraph(std::vector<std::vector<Edge>> &multigraph, Edge edge, TypeOfGraph graph_type);
 int find_number_of_cycles_in_graph(Edge *graph, TypeOfGraph graph_type);
 std::tuple<Edge*, Edge*> convert_multigraph_to_two_graph(std::vector<std::vector<Edge>> multigraph, TypeOfGraph graph_type);
