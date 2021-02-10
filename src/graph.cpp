@@ -159,7 +159,7 @@ bool contains_edge(Edge edge, Edge *edges, TypeOfGraph graph_type) {
 /// @param multigraph List of adjacency of both both W and Z
 /// @return Degree of a given vertex
 int degree_of_vertex_in_multigraph(int vertex_index, std::vector<std::vector<Edge>> &multigraph) {
-  std::vector<Edge> &vec = multigraph[vertex_index - 1];
+  std::vector<Edge> vec = multigraph[vertex_index - 1];
   int degree_of_vertex = 0;
   for (Edge e: vec) {
     if (e.graph_name == GraphName::Z_GRAPH) {
@@ -250,4 +250,183 @@ int find_number_of_cycles_in_graph_from_multigraph(std::vector<std::vector<Edge>
       if (i == 4) { break; }
     }
   }
+}
+
+/// Find number of components in a given graph
+/// @param graph Original graph
+/// @param graph_type Type of graph
+/// @return Number of components in a given graph
+int find_number_of_cycles_in_graph(Edge *graph, TypeOfGraph graph_type) {
+  int number_of_components_in_graph = 0;
+  while (true) {
+    Edge *cycle = find_cycle(graph, graph_type);
+    if (cycle == NULL) { break; }
+    number_of_components_in_graph += 1;
+  }
+
+  return number_of_components_in_graph;
+}
+
+/// Extract Z graph and W graph from multigraph
+/// @param multigraph Original multigraph
+/// @param graph_type Type of graph
+/// @return Tuple of newly allocated Z and W graphs
+std::tuple<Edge*, Edge*> convert_multigraph_to_two_graph(std::vector<std::vector<Edge>> multigraph, TypeOfGraph graph_type) {
+  Edge *z_graph = NULL;
+  Edge *w_graph = NULL;
+
+  // Fill Z graph and W graph with better solution
+  for (std::vector<Edge> vec: multigraph) {
+    for (Edge e: vec) {
+      // Filling Z graph
+      if (e.graph_name == GraphName::Z_GRAPH) {
+        if (contains_edge(e, z_graph, graph_type) == false) {
+          sb_push(z_graph, e);                
+        }
+      }
+
+      // Fillign W graph
+      if (e.graph_name == GraphName::W_GRAPH) {
+        if (contains_edge(e, w_graph, graph_type) == false) {
+          sb_push(w_graph, e);
+        }
+      }
+    }
+  }
+
+  return std::make_tuple(z_graph, w_graph);
+}
+
+/// Check if there's no three incident fixed edges
+/// Three incident fixed edges mean that attempt is no longer valid
+/// And we need to start again.
+/// @param broken_verticies Array of broken verticies
+/// @param multigraph Multigraph of all edges
+/// @return True if no incident fixed edges otherwise false
+bool no_three_incident_fixed_edges(std::vector<int> broken_verticies, std::vector<std::vector<Edge>> multigraph) {
+  // Check if there's no verticies with 3 incident fixed edges
+  for (int vertex_index: broken_verticies) {
+    std::vector<Edge> vec = multigraph[vertex_index - 1];
+    int number_of_fixed_edges = 0;
+    // Z graph
+    for (Edge e: vec) {
+      if (e.graph_name == GraphName::Z_GRAPH && e.fixed) {
+        number_of_fixed_edges += 1;
+      }
+    }
+
+    // Number of fixed incident edges is three or more so we should stop attempt
+    if (number_of_fixed_edges >= 3) { return false; }
+
+    // W graph
+    number_of_fixed_edges = 0;
+    for (Edge e: vec) {
+      if (e.graph_name == GraphName::W_GRAPH && e.fixed) {
+        number_of_fixed_edges += 1;
+      }
+    }
+
+    // Number of fixed incident edges is three or more so we should stop attempt
+    if (number_of_fixed_edges >= 3) { return false; }
+  }
+  
+  return true;
+}
+
+/// Unfix doubled edges in multigraph
+/// @param multigraph Original multigraph
+/// @param same_edges Array of doubled edges
+/// @param graph_type Type of graph
+void unfix_edges_in_multigraph(std::vector<std::vector<Edge>> &multigraph) {
+  for (auto &vec: multigraph) {
+    for (Edge &e: vec) {
+      e.fixed = false;
+    }
+  }
+}
+
+/// Fix doubled edges in multigraph
+/// @param multigraph Original multigraph
+/// @param same_edges Array of doubled edges
+/// @param graph_type Type of graph
+void fix_doubled_edges(std::vector<std::vector<Edge>> &multigraph, Tuple<Edge> *same_edges, TypeOfGraph graph_type) {
+  for (auto &vec: multigraph) {
+    for (Edge &e: vec) {
+      if (is_edge_contains_in(same_edges, e, graph_type)) {
+        e.fixed = true;
+      }
+    }
+  }
+}
+
+/// Add or delete vertex from broken verticies array
+/// @param edges Which adjacent edges to look in
+/// @param vertex_number Number of a given vertex
+/// @param broken_verticies Array of broken verticies
+void set_brokeness_of_verticies(std::vector<Edge> edges, int vertex_number, std::vector<int> &broken_verticies) {
+  // Check if the verticies now broken
+  // 1. Find degree of the vertex
+  int degree_of_vertex = 0;
+  for (Edge e: edges) {
+    if (e.graph_name == GraphName::Z_GRAPH) {
+      degree_of_vertex += 1;
+    }
+  }
+
+  if (degree_of_vertex == 2) {
+    // 2. If degree equal to 2 remove vertex from broken verticies
+    auto it = std::find(broken_verticies.begin(), broken_verticies.end(), vertex_number);
+    if (it != broken_verticies.end()) {
+      broken_verticies.erase(it);
+    }
+  } else {
+    // 3. If degree not equal to 2 add vertex if it not there already
+    auto it = std::find(broken_verticies.begin(), broken_verticies.end(), vertex_number);
+    if (it == broken_verticies.end()) {
+      broken_verticies.push_back(vertex_number);
+    }
+  }
+}
+
+/// Fix edge in multigraph and set in which graph it goes
+/// @param multigraph Original multigraph
+/// @param broken_verticies Array of broken verticies
+/// @param edge Edge to fix in multigraph
+/// @param graph_type Type of graph
+/// @param graph_name Name of graph to fix edge in
+void fix_edge_in_multigraph(std::vector<std::vector<Edge>> &multigraph, std::vector<int> &broken_verticies, Edge edge, 
+                                                                            TypeOfGraph graph_type, GraphName graph_name) {
+  std::vector<Edge> &start_vector = multigraph[edge.start.number - 1];
+  std::vector<Edge> &end_vector = multigraph[edge.end.number - 1];
+
+  for (Edge &e : start_vector) {
+    if (TypeOfGraph::DIRECTED == graph_type) {
+      if (are_edges_the_same_directed_graphs(e, edge)) {
+        e.fixed = true;
+        e.graph_name = graph_name;
+      }
+    } else {
+      if (are_edges_the_same_undirected_graphs(e, edge)) {
+        e.fixed = true;
+        e.graph_name = graph_name;
+      }
+    }
+  }
+
+  for (Edge &e: end_vector) {
+    if (TypeOfGraph::DIRECTED == graph_type) {
+      if (are_edges_the_same_directed_graphs(e, edge)) {
+        e.fixed = true;
+        e.graph_name = graph_name;
+      }
+    } else {
+      if (are_edges_the_same_undirected_graphs(e, edge)) {
+        e.fixed = true;
+        e.graph_name = graph_name;
+      }
+    }
+  }
+
+  set_brokeness_of_verticies(start_vector, edge.start.number, broken_verticies);
+  set_brokeness_of_verticies(end_vector, edge.end.number, broken_verticies);
 }

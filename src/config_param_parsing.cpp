@@ -80,6 +80,8 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
   // Configuration parameters
   TypeOfGraph type_of_graph = DIRECTED;
   char *path_to_test_file = NULL;
+  bool enable_first_neighborhood = false;
+  int attempt_limit = 1; 
 
   // Number of line to report in case of an error
   uint32_t number_of_line = 1;
@@ -103,6 +105,18 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
     } else if (str_compare(param.config_param_name, "test_file")) {
       path_to_test_file = (char*)allocate_and_zero(strlen(param.config_param_value) + 1);
       memcpy(path_to_test_file, param.config_param_value, strlen(param.config_param_value) + 1);
+    } else if (str_compare(param.config_param_name, "first_neighborhood")) {
+      if (str_compare(param.config_param_value, "enable")) {
+        enable_first_neighborhood = true;
+      } else if (str_compare(param.config_param_value, "disable")) {
+        enable_first_neighborhood = false;
+      } else {
+        printf("First neighborhood: disabled\n");
+        report_unknown_parameter_value(param.config_param_name, param.config_param_value, number_of_line);
+      }
+    } else if (str_compare(param.config_param_name, "attempt_limit")) {
+      attempt_limit = std::atoi(param.config_param_value);
+      printf("Attempt limit: %d\n", attempt_limit);
     } else {
       // Unkown type of parameter
       report_unknown_parameter(param.config_param_name, number_of_line);
@@ -123,5 +137,7 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
   return ConfigFlags({ 
     .graph_type = type_of_graph,
     .path_to_test_file = path_to_test_file,
+    .first_neighborhood_enabled = enable_first_neighborhood,
+    .attempt_limit = attempt_limit,
   });
 }
