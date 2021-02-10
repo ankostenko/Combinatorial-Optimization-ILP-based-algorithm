@@ -300,8 +300,8 @@ bool cycles_are_new_decomposition(SCIP *scip, Edge *z_graph, Edge *w_graph, Tupl
     set_text_green();
     printf("Found new Hamilton decomposition\n");
     reset_text_color();
-    print_edges(z_graph);
-    print_edges(w_graph);
+    // print_edges(z_graph);
+    // print_edges(w_graph);
     return true;
   } else {
     return false;

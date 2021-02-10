@@ -158,10 +158,10 @@ bool contains_edge(Edge edge, Edge *edges, TypeOfGraph graph_type) {
 /// @param vertex_index Index of vertex
 /// @param multigraph List of adjacency of both both W and Z
 /// @return Degree of a given vertex
-int degree_of_vertex_in_multigraph(int vertex_index, std::vector<std::vector<Edge>> &multigraph) {
-  std::vector<Edge> vec = multigraph[vertex_index - 1];
+int degree_of_vertex_in_multigraph(int vertex_index, const std::vector<std::vector<Edge>> &multigraph) {
+  const std::vector<Edge> &vec = multigraph[vertex_index - 1];
   int degree_of_vertex = 0;
-  for (Edge e: vec) {
+  for (const Edge &e: vec) {
     if (e.graph_name == GraphName::Z_GRAPH) {
       degree_of_vertex++;
     }
@@ -303,15 +303,15 @@ std::tuple<Edge*, Edge*> convert_multigraph_to_two_graph(std::vector<std::vector
 /// @param broken_verticies Array of broken verticies
 /// @param multigraph Multigraph of all edges
 /// @return True if no incident fixed edges otherwise false
-bool no_three_incident_fixed_edges(std::vector<int> broken_verticies, std::vector<std::vector<Edge>> multigraph) {
+bool no_three_incident_fixed_edges(const std::vector<int> &broken_verticies, const std::vector<std::vector<Edge>> &multigraph) {
   // Check if there's no verticies with 3 incident fixed edges
   for (int vertex_index: broken_verticies) {
-    std::vector<Edge> vec = multigraph[vertex_index - 1];
+    const std::vector<Edge> &vec = multigraph[vertex_index - 1];
     int number_of_fixed_edges = 0;
     // Z graph
-    for (Edge e: vec) {
-      if (e.graph_name == GraphName::Z_GRAPH && e.fixed) {
-        number_of_fixed_edges += 1;
+    for (const Edge &e: vec) {
+      if (e.graph_name == GraphName::Z_GRAPH) {
+        number_of_fixed_edges += e.fixed;
       }
     }
 
@@ -320,9 +320,9 @@ bool no_three_incident_fixed_edges(std::vector<int> broken_verticies, std::vecto
 
     // W graph
     number_of_fixed_edges = 0;
-    for (Edge e: vec) {
-      if (e.graph_name == GraphName::W_GRAPH && e.fixed) {
-        number_of_fixed_edges += 1;
+    for (const Edge &e: vec) {
+      if (e.graph_name == GraphName::W_GRAPH) {
+        number_of_fixed_edges += e.fixed;
       }
     }
 
@@ -363,11 +363,11 @@ void fix_doubled_edges(std::vector<std::vector<Edge>> &multigraph, Tuple<Edge> *
 /// @param edges Which adjacent edges to look in
 /// @param vertex_number Number of a given vertex
 /// @param broken_verticies Array of broken verticies
-void set_brokeness_of_verticies(std::vector<Edge> edges, int vertex_number, std::vector<int> &broken_verticies) {
+void set_brokeness_of_verticies(const std::vector<Edge> &edges, int vertex_number, std::vector<int> &broken_verticies) {
   // Check if the verticies now broken
   // 1. Find degree of the vertex
   int degree_of_vertex = 0;
-  for (Edge e: edges) {
+  for (const Edge &e: edges) {
     if (e.graph_name == GraphName::Z_GRAPH) {
       degree_of_vertex += 1;
     }
