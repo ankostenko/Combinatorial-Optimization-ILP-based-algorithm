@@ -200,6 +200,40 @@ void visit_edge_in_multigraph(std::vector<std::vector<Edge>> &multigraph, Edge e
   }
 }
 
+void visit_for_cycle_search_edge_in_multigraph_directed(std::vector<std::vector<Edge>> &multigraph, Edge edge) {
+  std::vector<Edge> &start_vector = multigraph[edge.start.number - 1];
+  std::vector<Edge> &end_vector = multigraph[edge.end.number - 1];
+
+  for (Edge &e : start_vector) {
+    if (are_edges_the_same_directed_graphs(e, edge)) {
+      e.visited_for_cycle_search = true;
+    }
+  }
+
+  for (Edge &e: end_vector) {
+    if (are_edges_the_same_directed_graphs(e, edge)) {
+      e.visited_for_cycle_search = true;
+    }
+  }
+}
+
+void visit_for_cycle_search_edge_in_multigraph_undirected(std::vector<std::vector<Edge>> &multigraph, Edge edge) {
+  std::vector<Edge> &start_vector = multigraph[edge.start.number - 1];
+  std::vector<Edge> &end_vector = multigraph[edge.end.number - 1];
+
+  for (Edge &e : start_vector) {
+    if (are_edges_the_same_undirected_graphs(e, edge)) {
+      e.visited_for_cycle_search = true;
+    }
+  }
+
+  for (Edge &e: end_vector) {
+    if (are_edges_the_same_undirected_graphs(e, edge)) {
+      e.visited_for_cycle_search = true;
+    }
+  }
+}
+
 /// Fix edge in multigraph and set in which graph it goes
 void visit_for_cycle_search_edge_in_multigraph(std::vector<std::vector<Edge>> &multigraph, Edge edge, TypeOfGraph graph_type) {
   std::vector<Edge> &start_vector = multigraph[edge.start.number - 1];
@@ -229,7 +263,6 @@ void visit_for_cycle_search_edge_in_multigraph(std::vector<std::vector<Edge>> &m
     }
   }
 }
-
 
 /// Find number of cycles in given graph
 int find_number_of_cycles_in_graph_from_multigraph(std::vector<std::vector<Edge>> &multigraph, GraphName graph_name, TypeOfGraph graph_type) {
@@ -280,11 +313,18 @@ int find_number_of_cycles_in_graph_from_multigraph(std::vector<std::vector<Edge>
         Edge &e = copy_to_vector[i];
         if (e.visited_for_cycle_search == true) { continue; }
         if (e.graph_name == graph_name) {
-          if (((graph_type == TypeOfGraph::UNDIRECTED) && edges_conjunct_undirected_graphs(e, current_edge))|| 
-              ((graph_type == TypeOfGraph::DIRECTED)   && edges_conjunct_directed_graphs(e, current_edge))) {
-            visit_for_cycle_search_edge_in_multigraph(multigraph, e, graph_type);
-            current_edge = e;
-            break;
+          if (graph_type == TypeOfGraph::UNDIRECTED) {
+            if (edges_conjunct_undirected_graphs(e, current_edge)) {
+              visit_for_cycle_search_edge_in_multigraph_undirected(multigraph, e);
+              current_edge = e;
+              break;
+            }
+          } else {
+            if (edges_conjunct_directed_graphs(e, current_edge)) {
+              visit_for_cycle_search_edge_in_multigraph_directed(multigraph, e);
+              current_edge = e;
+              break;
+            }
           }
         }
       }
@@ -299,6 +339,10 @@ int find_number_of_cycles_in_graph_from_multigraph(std::vector<std::vector<Edge>
 /// @param graph_type Type of graph
 /// @return Number of components in a given graph
 int find_number_of_cycles_in_graph(Edge *graph, TypeOfGraph graph_type) {
+  for (int i = 0; i < sb_count(graph); i++) {
+    graph[i].visited = false;
+  }
+
   int number_of_components_in_graph = 0;
   while (true) {
     Edge *cycle = find_cycle(graph, graph_type);

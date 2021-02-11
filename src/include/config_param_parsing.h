@@ -10,7 +10,9 @@ struct ConfigFlags {
   const char *path_to_test_file;
   bool first_neighborhood_enabled;
   int attempt_limit = 1;
-  bool second_neighborhood_enabled;
+  bool generate_cycles;
+  int number_of_verticies = 1;
+  int number_of_tests = 1;
 };
 
 /// Struct stores information about configuration parameter

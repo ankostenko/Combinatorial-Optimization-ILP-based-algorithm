@@ -35,11 +35,16 @@ SCIP_RETCODE add_first_constraint(SCIP *scip, Graph first, Graph second) {
     sb_push(first_constraint_coefficients, 1.0);
   }
 
-  SCIP_CALL(SCIPcreateConsBasicLinear(scip, &constraint, "First constraint", sb_count(constraint_variables), 
-      constraint_variables, first_constraint_coefficients, first.number_of_verticies(), first.number_of_verticies()));
+  int constraint_variables_count = sb_count(constraint_variables);
+  int first_number_of_verticies = first.number_of_verticies();
+
+  SCIP_CALL(SCIPcreateConsBasicLinear(scip, &constraint, "First constraint", constraint_variables_count, 
+      constraint_variables, first_constraint_coefficients, first_number_of_verticies, first_number_of_verticies));
   SCIP_CALL(SCIPaddCons(scip, constraint));
 
   SCIP_CALL(SCIPreleaseCons(scip, &constraint));
+
+  sb_free(constraint_variables);
 
   return SCIP_OKAY;
 }
@@ -203,6 +208,10 @@ SCIP_RETCODE add_seventh_constraint(SCIP *scip, Tuple<Edge> *same_edges) {
 /// @param graph Graph to find 
 /// @return Return true if found cycle is hamilton cycle of the graph, false otherwise
 bool find_cycles_and_add_to_constraints(SCIP *scip, Edge *graph, Tuple<Edge> *same_edges, TypeOfGraph graph_type) {
+  for (int i = 0; i < sb_count(graph); i++) {
+    graph[i].visited = false;
+  }
+
   // Try to find cycles until all edges are not available
   while (true) {
     Edge *current_cycle = find_cycle(graph, graph_type);

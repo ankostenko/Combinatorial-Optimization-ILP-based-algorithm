@@ -81,7 +81,10 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
   TypeOfGraph type_of_graph = DIRECTED;
   char *path_to_test_file = NULL;
   bool enable_first_neighborhood = false;
-  int attempt_limit = 1; 
+  int attempt_limit = -1;
+  bool generate_cycles = false;
+  int generate_number_of_verticies = -1;
+  int number_of_tests = -1;
 
   // Number of line to report in case of an error
   uint32_t number_of_line = 1;
@@ -99,8 +102,12 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
         printf("Type of graph: undirected\n");
         type_of_graph = UNDIRECTED;
       } else {
-        printf("Type of graph: directed\n");
         report_unknown_parameter_value(param.config_param_name, param.config_param_value, number_of_line);
+        printf("Type of graph available options: ");
+        set_text_yellow();
+        printf("directed | undirected\n");
+        reset_text_color();
+        exit(0);
       }
     } else if (str_compare(param.config_param_name, "test_file")) {
       path_to_test_file = (char*)allocate_and_zero(strlen(param.config_param_value) + 1);
@@ -111,12 +118,33 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
       } else if (str_compare(param.config_param_value, "disable")) {
         enable_first_neighborhood = false;
       } else {
-        printf("First neighborhood: disabled\n");
         report_unknown_parameter_value(param.config_param_name, param.config_param_value, number_of_line);
+        printf("First neighborhood available options: ");
+        set_text_yellow();
+        printf("disable | enable\n");
+        reset_text_color();
+        exit(0);
       }
     } else if (str_compare(param.config_param_name, "attempt_limit")) {
       attempt_limit = std::atoi(param.config_param_value);
       printf("Attempt limit: %d\n", attempt_limit);
+    } else if (str_compare(param.config_param_name, "generate_cycles")) {
+      if (str_compare(param.config_param_value, "true")) {
+        generate_cycles = true;
+      } else if (str_compare(param.config_param_value, "false")) {
+        generate_cycles = false;
+      } else {
+        report_unknown_parameter_value(param.config_param_name, param.config_param_value, number_of_line);
+        printf("Generate cycles available options: ");
+        set_text_yellow();
+        printf("true | false\n");
+        reset_text_color();
+        exit(0);
+      }
+    } else if (str_compare(param.config_param_name, "number_of_verticies")) {
+      generate_number_of_verticies = std::atoi(param.config_param_value);
+    } else if (str_compare(param.config_param_name, "number_of_tests")) {
+      number_of_tests = std::atoi(param.config_param_value);
     } else {
       // Unkown type of parameter
       report_unknown_parameter(param.config_param_name, number_of_line);
@@ -129,6 +157,27 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
     number_of_line++;   
   }
 
+  if (attempt_limit == -1) {
+    report_problem_to_user(true, "No 'attempt_limit' parameter is given. Omitting configuration parameters is not allowed.");
+  }
+
+  if (path_to_test_file == NULL) {
+    report_problem_to_user(true, "No path to the test file is given.");
+  }
+
+  if (generate_number_of_verticies == -1) {
+    report_problem_to_user(true, "No 'number_of_verticies' parameter is given. Omitting configuration parameters is not allowed.");
+  }
+
+  if (number_of_tests == -1) {
+    report_problem_to_user(true, "No 'number_of_tests' parameter is given. Omitting configuration parameters is not allowed.");
+  }
+
+  if (generate_cycles) {
+    printf("Number of verticies: %d\n", generate_number_of_verticies);
+    printf("Number of tests: %d\n", number_of_tests);
+  }
+
   // Close configuration file
   fclose(config_file);
   // Deallocate memory for the configuration file buffer
@@ -139,5 +188,8 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
     .path_to_test_file = path_to_test_file,
     .first_neighborhood_enabled = enable_first_neighborhood,
     .attempt_limit = attempt_limit,
+    .generate_cycles = generate_cycles,
+    .number_of_verticies = generate_number_of_verticies,
+    .number_of_tests = number_of_tests
   });
 }
