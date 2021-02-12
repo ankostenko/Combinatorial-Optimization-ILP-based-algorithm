@@ -306,11 +306,6 @@ bool cycles_are_new_decomposition(SCIP *scip, Edge *z_graph, Edge *w_graph, Tupl
   bool w_graph_is_complete_cycle = find_cycles_and_add_to_constraints(scip, w_graph, same_edges, graph_type);
   
   if (z_graph_is_complete_cycle && w_graph_is_complete_cycle) {
-    set_text_green();
-    printf("Found new Hamilton decomposition\n");
-    reset_text_color();
-    // print_edges(z_graph);
-    // print_edges(w_graph);
     return true;
   } else {
     return false;

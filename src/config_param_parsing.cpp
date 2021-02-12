@@ -115,8 +115,16 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
     } else if (str_compare(param.config_param_name, "first_neighborhood")) {
       if (str_compare(param.config_param_value, "enable")) {
         enable_first_neighborhood = true;
+        printf("Local search 1: ");
+        set_text_green();
+        printf("enabled\n");
+        reset_text_color();
       } else if (str_compare(param.config_param_value, "disable")) {
         enable_first_neighborhood = false;
+        printf("Local search 1: ");
+        set_text_red();
+        printf("disabled\n");
+        reset_text_color();
       } else {
         report_unknown_parameter_value(param.config_param_name, param.config_param_value, number_of_line);
         printf("First neighborhood available options: ");

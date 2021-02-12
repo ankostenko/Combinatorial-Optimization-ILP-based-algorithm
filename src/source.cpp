@@ -24,6 +24,8 @@
 #include "scip/struct_scip.h"
 #include "scip/sol.h"
 
+#include <time.h>
+
 #include <omp.h>
 
 #define SOKOL_TIME_IMPL
@@ -38,8 +40,44 @@ void chain_edge_fixing(Edge edge, GraphName graph_to_fix, std::vector<std::vecto
   // Fix edge
   fix_edge_in_multigraph(multigraph, broken_verticies, edge, graph_type, graph_to_fix);
 
-  if (TypeOfGraph::DIRECTED) {
+  if (TypeOfGraph::DIRECTED == graph_type) {
 
+    if (!no_three_incident_fixed_edges(broken_verticies, multigraph)) {
+      return;
+    }
+
+    if (broken_verticies.empty()) {
+      return;
+    }
+
+    visit_edge_in_multigraph(multigraph, edge, graph_type);
+
+    std::vector<Edge> &outgoing_edges = multigraph[edge.start.number - 1];
+    Edge outgoing_edge = { .fixed = true };
+    for (Edge e: outgoing_edges) {
+      if (e.fixed == false && e.start.number == edge.start.number) {
+        outgoing_edge = e;
+        break;
+      }
+    }
+
+    if (outgoing_edge.fixed == false) {
+      chain_edge_fixing(outgoing_edge, GraphName::Z_GRAPH == graph_to_fix ? GraphName::W_GRAPH : GraphName::Z_GRAPH, 
+                    multigraph, broken_verticies, graph_type);
+    }
+
+    std::vector<Edge> &ingoing_edges = multigraph[edge.end.number - 1];
+    Edge ingoing_edge = { .fixed = true };
+    for (Edge e: ingoing_edges) {
+      if (e.fixed == false && e.end.number == edge.end.number) {
+        ingoing_edge = e;
+        break;
+      }
+    }
+    if (ingoing_edge.fixed == false) {
+      chain_edge_fixing(ingoing_edge, GraphName::Z_GRAPH == graph_to_fix ? GraphName::W_GRAPH : GraphName::Z_GRAPH,
+                    multigraph, broken_verticies, graph_type);
+    }
   } else {
     // Find number of incident edges to the start vertex
     std::vector<Edge> &start_vector = multigraph[edge.start.number - 1];
@@ -124,6 +162,8 @@ std::tuple<bool, Edge *, Edge *> local_search_1(Edge *z_graph, Edge *w_graph, Tu
 
   std::shuffle(z_graph_indices.begin(), z_graph_indices.end(), g);
 
+  srand(time(NULL));
+
   Edge chosen_edge = { .start = { -1 } };
   for (int index : z_graph_indices) {
     std::vector<Edge> &z_graph_at_index = multigraph[index];
@@ -135,8 +175,28 @@ std::tuple<bool, Edge *, Edge *> local_search_1(Edge *z_graph, Edge *w_graph, Tu
 
         // Make copy of current graph
         std::vector<std::vector<Edge>> multigraph_copy = multigraph;
-
+        
         chain_edge_fixing(chosen_edge, GraphName::W_GRAPH, multigraph, broken_verticies, graph_type);
+        
+        if (graph_type == TypeOfGraph::DIRECTED && broken_verticies.empty()) {
+          int new_number_of_components_in_z_graph = find_number_of_cycles_in_graph_from_multigraph(multigraph, GraphName::Z_GRAPH, graph_type);
+          int new_number_of_components_in_w_graph = find_number_of_cycles_in_graph_from_multigraph(multigraph, GraphName::W_GRAPH, graph_type);
+
+          if (new_number_of_components_in_z_graph + new_number_of_components_in_w_graph 
+              < number_of_components_in_z_graph + number_of_components_in_w_graph) {
+            std::tie(z_graph, w_graph) = convert_multigraph_to_two_graph(multigraph, graph_type);
+            return std::make_tuple(true, z_graph, w_graph);
+          } else {
+            multigraph = multigraph_copy;
+
+            // Unfix all edges and fix only doubled edges
+            unfix_edges_in_multigraph(multigraph);
+            fix_doubled_edges(multigraph, same_edges, graph_type);
+            continue;
+          }
+        }
+        
+        std::vector<int> broken_verticies_copy = broken_verticies;
         for (int i = 0; i < attempt_limit; i++) {
           // Z contains a vertex with degree not equal to 2
           while (true) {
@@ -145,7 +205,9 @@ std::tuple<bool, Edge *, Edge *> local_search_1(Edge *z_graph, Edge *w_graph, Tu
               break;
             }
 
-            for (int vertex_index : broken_verticies) {
+            size_t vertex_index;
+            for (size_t i = 0; i < broken_verticies.size(); i++) {
+              vertex_index = broken_verticies[i];
               for (Edge e: multigraph[vertex_index - 1]) {
                 if (e.fixed == false) {
                   chosen_edge = e;
@@ -162,20 +224,39 @@ std::tuple<bool, Edge *, Edge *> local_search_1(Edge *z_graph, Edge *w_graph, Tu
 
             // Check degree of vertex
             if (degree_of_vertex_in_multigraph(chosen_edge.start.number, multigraph) == 1 || 
-                degree_of_vertex_in_multigraph(chosen_edge.end.number, multigraph)   == 1) {
+                degree_of_vertex_in_multigraph(chosen_edge.end.number, multigraph) == 1) {
               // Degree of vertex is equal to 1
-              switch(1) {
-                case 1: {
+
+              int choose_case = rand() % 2;
+              switch(choose_case) {
+                case 0: {
                   chain_edge_fixing(chosen_edge, GraphName::Z_GRAPH, multigraph, broken_verticies, graph_type);
+                } break;
+                case 1: {
+                  for (Edge e: multigraph[vertex_index - 1]) {
+                    if (e.fixed == false && !are_edges_the_same_undirected_graphs(e, chosen_edge)) {
+                      chain_edge_fixing(e, GraphName::Z_GRAPH, multigraph, broken_verticies, graph_type);
+                      break;
+                    }
+                  }
                 } break;
               }
             } else if (degree_of_vertex_in_multigraph(chosen_edge.start.number, multigraph) == 3 ||
                       degree_of_vertex_in_multigraph(chosen_edge.end.number, multigraph) == 3) {
               // Degree of vertex is equal to 3
-              switch(1) {
+              int choose_case = rand() % 2;
+              switch(choose_case) {
                 case 1: {
                   chain_edge_fixing(chosen_edge, GraphName::W_GRAPH, multigraph, broken_verticies, graph_type);
                 } break;
+                case 2: {
+                  for (Edge e: multigraph[vertex_index - 1]) {
+                    if (e.fixed == false && !are_edges_the_same_undirected_graphs(e, chosen_edge)) {
+                      chain_edge_fixing(e, GraphName::W_GRAPH, multigraph, broken_verticies, graph_type);
+                      break;
+                    }
+                  }
+                }
               }
             }
 
@@ -211,6 +292,7 @@ std::tuple<bool, Edge *, Edge *> local_search_1(Edge *z_graph, Edge *w_graph, Tu
           stop_attempt:
           // Restore original Z and W graphs
           multigraph = multigraph_copy;
+          broken_verticies = broken_verticies_copy;
 
           // Unfix all edges and fix only doubled edges
           unfix_edges_in_multigraph(multigraph);
@@ -224,16 +306,15 @@ std::tuple<bool, Edge *, Edge *> local_search_1(Edge *z_graph, Edge *w_graph, Tu
 }
 
 /// Variable neighborhood descent
-bool variable_neighborhood_descent(SCIP *scip, Edge *z_graph, Edge *w_graph, Tuple<Edge> *same_edges, int attempt_limit, TypeOfGraph graph_type) {
+std::tuple<bool, Edge*, Edge*> variable_neighborhood_descent(SCIP *scip, Edge *z_graph, Edge *w_graph, Tuple<Edge> *same_edges, int attempt_limit, TypeOfGraph graph_type) {
   do {
     // Local search
-    auto [has_improvement, new_z_graph, new_w_graph] = local_search_1(z_graph, w_graph, same_edges, attempt_limit, graph_type);
-    z_graph = new_z_graph;
-    w_graph = new_w_graph;
+    bool has_improvement = false;
+    std::tie(has_improvement, z_graph, w_graph) = local_search_1(z_graph, w_graph, same_edges, attempt_limit, graph_type);
     
-        // Determine if Z graph and W graph are hamilton decomposition
+    // Determine if Z graph and W graph are hamilton decomposition
     if (cycles_are_new_decomposition(scip, z_graph, w_graph, same_edges, graph_type)) {
-      return true;
+      return std::make_tuple(true, z_graph, w_graph);
     }
     
     if (has_improvement) {
@@ -243,7 +324,7 @@ bool variable_neighborhood_descent(SCIP *scip, Edge *z_graph, Edge *w_graph, Tup
     break;
   } while(true);
 
-  return false;
+  return std::make_tuple(false, z_graph, w_graph);
 }
 
 /// Initialize SCIP
@@ -285,9 +366,13 @@ int main(int argc, char **argv) {
   double scip_average_time = 0.0;
   double cycle_analysis_average_time = 0.0;
   double local_search_1_analysis_average_time = 0.0;
+  double has_solution_average_time = 0.0;
+  double no_solution_average_time = 0.0;
   float number_of_iterations = 0.0f;
 
   int number_of_tests = 0;
+  int number_of_tests_has_solution = 0;
+  int number_of_tests_no_solution = 0;
 
   std::vector<int> vertex_vector;
   vertex_vector.reserve(flags.number_of_verticies); vertex_vector.clear();
@@ -323,20 +408,25 @@ int main(int argc, char **argv) {
     }
 
     uint64_t general_start =  stm_now();
+    uint64_t has_solution_start = stm_now();
+    uint64_t no_solution_start = stm_now();
 
     // Increment number of tests
     number_of_tests += 1;
 
-    // if (number_of_tests == 12) { continue; };
-
-    printf("Test number %d in progress\n", number_of_tests);
-
     // Check if number of tests with generated cycles is got their limit
     if (flags.generate_cycles) {
-      if (number_of_tests == flags.number_of_tests) {
+      if (number_of_tests > flags.number_of_tests) {
+        number_of_tests -= 1;
         break;
       }
     }
+
+    for (int i = number_of_tests; i > 0; i /= 2) {
+      printf("\b");
+    }
+    printf("\b\b\b\b\b\b\b\b\b\b\b\b\b\b");
+    printf("Running test #%d", number_of_tests);
 
     // Set graphs to the corresponding cycles
     Graph first = bundle.first;
@@ -411,6 +501,12 @@ int main(int argc, char **argv) {
     
       // Print solution on the current step
       if (!(SCIPgetNSols(scip) > 0)) {
+        uint64_t no_solution_elapsed = stm_since(no_solution_start);
+        double no_solution_milliseconds = stm_ms(no_solution_elapsed);
+        no_solution_average_time += no_solution_milliseconds;
+
+        number_of_tests_no_solution += 1;
+
         // No solution
         no_decomposition++;
         break;
@@ -439,6 +535,12 @@ int main(int argc, char **argv) {
       if (cycles_are_new_decomposition(scip, z_graph, w_graph, same_edges, flags.graph_type)) {
         // Found new decomposition
         has_decomposition++;
+
+        number_of_tests_has_solution += 1;
+
+        uint64_t has_solution_elapsed = stm_since(has_solution_start);
+        double has_solution_milliseconds = stm_ms(has_solution_elapsed);
+        has_solution_average_time += has_solution_milliseconds;
         
         uint64_t cycle_analysis_elapsed = stm_since(cycle_analysis_start);
         double cycle_analysis_milliseconds = stm_ms(cycle_analysis_elapsed);
@@ -458,11 +560,30 @@ int main(int argc, char **argv) {
       uint64_t local_search_1_analysis_start = stm_now();
 
       // Local search with respect to the first neighborhood
-      if (flags.graph_type == TypeOfGraph::UNDIRECTED && flags.first_neighborhood_enabled) {
-        if (variable_neighborhood_descent(scip, z_graph, w_graph, same_edges, flags.attempt_limit, flags.graph_type)) {
-          // Found new decomposition
-          has_decomposition++;
-          
+      if (flags.first_neighborhood_enabled) {
+        bool has_solution = false;
+        std::tie(has_solution, z_graph, w_graph) = variable_neighborhood_descent(scip, z_graph, w_graph, same_edges, flags.attempt_limit, flags.graph_type);
+        
+        bool z_graph_is_different = false;
+        bool w_graph_is_different = false;
+        if (has_solution) {
+          for (int i = 0; i < sb_count(z_graph); i++) {
+            if (!contains_edge(bundle.first.edges[i], z_graph, flags.graph_type)) {
+              z_graph_is_different = true;
+              break;
+            }
+          }
+
+          for (int i = 0; i < sb_count(w_graph); i++) {
+            if (!contains_edge(bundle.first.edges[i], w_graph, flags.graph_type)) {
+              w_graph_is_different = true;
+              break;
+            }
+          }
+        }
+
+        if (z_graph_is_different && w_graph_is_different) {
+          // We have a valid solution
           uint64_t local_search_1_analysis_elapsed = stm_since(local_search_1_analysis_start);
           double local_search_1_analysis_milliseconds = stm_ms(local_search_1_analysis_elapsed);
           local_search_1_analysis_average_time += local_search_1_analysis_milliseconds;
@@ -470,7 +591,15 @@ int main(int argc, char **argv) {
           uint64_t general_elapsed = stm_since(general_start);
           double general_milliseconds = stm_ms(general_elapsed);
           general_average_time += general_milliseconds;
-          break;
+          
+          has_decomposition++;
+
+          number_of_tests_has_solution += 1;
+
+          uint64_t has_solution_elapsed = stm_since(has_solution_start);
+          double has_solution_milliseconds = stm_ms(has_solution_elapsed);
+          has_solution_average_time += has_solution_milliseconds;
+          goto has_valid_solution;
         }
       }
 
@@ -484,17 +613,32 @@ int main(int argc, char **argv) {
 
       uint64_t general_elapsed = stm_since(general_start);
       double general_milliseconds = stm_ms(general_elapsed);
-
       general_average_time += general_milliseconds;
-
     } while(true);
 
+    has_valid_solution:
+
+    // Release variables
+    for (size_t i = 0; i < bundle.first.number_of_edges(); i++) {
+      SCIP_CALL(SCIPreleaseVar(scip, &bundle.first.edges[i].var));
+      SCIP_CALL(SCIPreleaseVar(scip, &bundle.second.edges[i].var));
+    }
+
+    // Free cycles
+    sb_free(bundle.first.edges);
+    sb_free(bundle.first.verticies);
+    sb_free(bundle.second.edges);
+    sb_free(bundle.second.verticies);
+
+    // Release SCIP structure
     SCIP_CALL(SCIPfree(&scip));
   }
 
-  printf("Results:\nNo decomposition: %d, Decomposition: %d\n", no_decomposition, has_decomposition);
+  printf("\nResults:\nNo decomposition: %d, Decomposition: %d\n", no_decomposition, has_decomposition);
   printf("Number of tests: %d\n", number_of_tests);
   printf("General average time: %f ms\n", general_average_time / number_of_tests);
+  printf("Has solution average time: %f ms\n", has_solution_average_time / number_of_tests_has_solution);
+  printf("No solution average time: %f ms\n", no_solution_average_time / number_of_tests_no_solution);
   printf("Constraint construction average time: %f ms\n", constraint_construction_time_average_time / number_of_tests);
   printf("SCIP average time: %f ms\n", scip_average_time / number_of_tests);
   printf("Cycle analysis average time: %f ms\n", cycle_analysis_average_time / number_of_tests);
