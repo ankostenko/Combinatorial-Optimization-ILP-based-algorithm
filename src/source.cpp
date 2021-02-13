@@ -41,7 +41,6 @@ void chain_edge_fixing(Edge edge, GraphName graph_to_fix, std::vector<std::vecto
   fix_edge_in_multigraph(multigraph, broken_verticies, edge, graph_type, graph_to_fix);
 
   if (TypeOfGraph::DIRECTED == graph_type) {
-
     if (!no_three_incident_fixed_edges(broken_verticies, multigraph)) {
       return;
     }
@@ -161,8 +160,6 @@ std::tuple<bool, Edge *, Edge *> local_search_1(Edge *z_graph, Edge *w_graph, Tu
   std::vector<int> broken_verticies;
 
   std::shuffle(z_graph_indices.begin(), z_graph_indices.end(), g);
-
-  srand(time(NULL));
 
   Edge chosen_edge = { .start = { -1 } };
   for (int index : z_graph_indices) {
@@ -371,8 +368,6 @@ int main(int argc, char **argv) {
   float number_of_iterations = 0.0f;
 
   int number_of_tests = 0;
-  int number_of_tests_has_solution = 0;
-  int number_of_tests_no_solution = 0;
 
   std::vector<int> vertex_vector;
   vertex_vector.reserve(flags.number_of_verticies); vertex_vector.clear();
@@ -432,6 +427,7 @@ int main(int argc, char **argv) {
     Graph first = bundle.first;
     Graph second = bundle.second;
 
+    // Start constraint construction timings
     uint64_t constraint_construction_time_start = stm_now();
 
     SCIP *scip = NULL;
@@ -478,10 +474,8 @@ int main(int argc, char **argv) {
     // Add (7) constraint
     SCIP_CALL(add_seventh_constraint(scip, same_edges));
 
-    uint64_t constraint_construction_time_elapsed = stm_since(constraint_construction_time_start);
-    double constraint_construction_milliseconds = stm_ms(constraint_construction_time_elapsed);
-
-    constraint_construction_time_average_time += constraint_construction_milliseconds;
+    // Stop constraint construction timing
+    constraint_construction_time_average_time += stop_time(constraint_construction_time_start);
 
     do {
       // Number of iterations of the algorithm for one cycle 
@@ -490,22 +484,19 @@ int main(int argc, char **argv) {
       Edge *z_graph = NULL;
       Edge *w_graph = NULL;
 
+      // Start scip timing
       uint64_t scip_start = stm_now();
 
       // Solve problem
       SCIP_CALL(SCIPsolve(scip));
 
-      uint64_t scip_elapsed = stm_since(scip_start);
-      double scip_milliseconds = stm_ms(scip_elapsed);
-      scip_average_time += scip_milliseconds;
+      // Stop scip timing
+      scip_average_time += stop_time(scip_start);
     
       // Print solution on the current step
       if (!(SCIPgetNSols(scip) > 0)) {
-        uint64_t no_solution_elapsed = stm_since(no_solution_start);
-        double no_solution_milliseconds = stm_ms(no_solution_elapsed);
-        no_solution_average_time += no_solution_milliseconds;
-
-        number_of_tests_no_solution += 1;
+        // Stop general timer and no solution timer
+        no_solution_average_time += stop_time(no_solution_start);
 
         // No solution
         no_decomposition++;
@@ -530,33 +521,22 @@ int main(int argc, char **argv) {
       // Free transformed problem in order to add new constraint to the problem
       SCIPfreeTransform(scip);
 
+      // Start cycle analysis time
       uint64_t cycle_analysis_start = stm_now();
 
       if (cycles_are_new_decomposition(scip, z_graph, w_graph, same_edges, flags.graph_type)) {
         // Found new decomposition
         has_decomposition++;
 
-        number_of_tests_has_solution += 1;
-
-        uint64_t has_solution_elapsed = stm_since(has_solution_start);
-        double has_solution_milliseconds = stm_ms(has_solution_elapsed);
-        has_solution_average_time += has_solution_milliseconds;
-        
-        uint64_t cycle_analysis_elapsed = stm_since(cycle_analysis_start);
-        double cycle_analysis_milliseconds = stm_ms(cycle_analysis_elapsed);
-        cycle_analysis_average_time += cycle_analysis_milliseconds;
-
-
-        uint64_t general_elapsed = stm_since(general_start);
-        double general_milliseconds = stm_ms(general_elapsed);
-        general_average_time += general_milliseconds;
+        has_solution_average_time += stop_time(has_solution_start);
+        cycle_analysis_average_time += stop_time(cycle_analysis_start);
         break;
       }
+      
+      // Stop cycle analysis timer
+      cycle_analysis_average_time += stop_time(cycle_analysis_start);
 
-      uint64_t cycle_analysis_elapsed = stm_since(cycle_analysis_start);
-      double cycle_analysis_milliseconds = stm_ms(cycle_analysis_elapsed);
-      cycle_analysis_average_time += cycle_analysis_milliseconds;
-
+      // Start local search time
       uint64_t local_search_1_analysis_start = stm_now();
 
       // Local search with respect to the first neighborhood
@@ -584,38 +564,25 @@ int main(int argc, char **argv) {
 
         if (z_graph_is_different && w_graph_is_different) {
           // We have a valid solution
-          uint64_t local_search_1_analysis_elapsed = stm_since(local_search_1_analysis_start);
-          double local_search_1_analysis_milliseconds = stm_ms(local_search_1_analysis_elapsed);
-          local_search_1_analysis_average_time += local_search_1_analysis_milliseconds;
-          
-          uint64_t general_elapsed = stm_since(general_start);
-          double general_milliseconds = stm_ms(general_elapsed);
-          general_average_time += general_milliseconds;
+          local_search_1_analysis_average_time += stop_time(local_search_1_analysis_start);
+          general_average_time += stop_time(general_start);
+          has_solution_average_time += stop_time(has_solution_start);
           
           has_decomposition++;
-
-          number_of_tests_has_solution += 1;
-
-          uint64_t has_solution_elapsed = stm_since(has_solution_start);
-          double has_solution_milliseconds = stm_ms(has_solution_elapsed);
-          has_solution_average_time += has_solution_milliseconds;
           goto has_valid_solution;
         }
       }
 
-      uint64_t local_search_1_analysis_elapsed = stm_since(local_search_1_analysis_start);
-      double local_search_1_analysis_milliseconds = stm_ms(local_search_1_analysis_elapsed);
-      local_search_1_analysis_average_time += local_search_1_analysis_milliseconds;
+      // Stop local search timer
+      local_search_1_analysis_average_time += stop_time(local_search_1_analysis_start);
 
       // Free z and w graphs
       sb_free(z_graph);
       sb_free(w_graph);
 
-      uint64_t general_elapsed = stm_since(general_start);
-      double general_milliseconds = stm_ms(general_elapsed);
-      general_average_time += general_milliseconds;
     } while(true);
 
+    general_average_time += stop_time(general_start);
     has_valid_solution:
 
     // Release variables
@@ -637,8 +604,8 @@ int main(int argc, char **argv) {
   printf("\nResults:\nNo decomposition: %d, Decomposition: %d\n", no_decomposition, has_decomposition);
   printf("Number of tests: %d\n", number_of_tests);
   printf("General average time: %f ms\n", general_average_time / number_of_tests);
-  printf("Has solution average time: %f ms\n", has_solution_average_time / number_of_tests_has_solution);
-  printf("No solution average time: %f ms\n", no_solution_average_time / number_of_tests_no_solution);
+  printf("Has solution average time: %f ms\n", has_solution_average_time / has_decomposition);
+  printf("No solution average time: %f ms\n", no_solution_average_time / no_decomposition);
   printf("Constraint construction average time: %f ms\n", constraint_construction_time_average_time / number_of_tests);
   printf("SCIP average time: %f ms\n", scip_average_time / number_of_tests);
   printf("Cycle analysis average time: %f ms\n", cycle_analysis_average_time / number_of_tests);

@@ -135,7 +135,9 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
       }
     } else if (str_compare(param.config_param_name, "attempt_limit")) {
       attempt_limit = std::atoi(param.config_param_value);
-      printf("Attempt limit: %d\n", attempt_limit);
+      if (type_of_graph == TypeOfGraph::UNDIRECTED) {
+        printf("Attempt limit: %d\n", attempt_limit);
+      }
     } else if (str_compare(param.config_param_name, "generate_cycles")) {
       if (str_compare(param.config_param_value, "true")) {
         generate_cycles = true;

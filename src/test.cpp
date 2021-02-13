@@ -8,6 +8,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include <random>
+
 #include "utils.h"
 
 #include "stretchy_buffer.h"
@@ -165,6 +167,18 @@ int main() {
   stretchy_buffer_length();
   complete_cycle();
   no_cycles_in_directed_graph();
+
+  std::vector<int> vertex_vector;
+  vertex_vector.reserve(2048); vertex_vector.clear();
+  for (int i = 1; i <= 2048; i++) {
+    vertex_vector.push_back(i);
+  }
+
+  // Initialize random devices
+  std::random_device rd;
+  std::mt19937 g(rd());
+
+  
 
   // Results
   print_result();

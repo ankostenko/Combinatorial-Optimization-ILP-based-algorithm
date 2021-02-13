@@ -16,6 +16,7 @@ void deallocate_and_null(void** ptr);
 char* trim_non_alphanumeric_start_end(const char *line);
 size_t get_size_of_file(FILE *file_stream);
 bool is_edge_contains_in(Tuple<Edge> *edges, Edge edge, TypeOfGraph graph_type);
+double stop_time(uint64_t start_time);
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"

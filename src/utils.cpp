@@ -5,6 +5,7 @@
 #include <ctype.h>
 
 #include "utils.h"
+#include "sokol_time.h"
 
 /// Check if provided strings are equal
 bool str_compare(const char *str_1, const char *str_2) {
@@ -149,4 +150,10 @@ void deallocate_and_null(void** ptr) {
   
   free(*ptr);
   *ptr = NULL;
+}
+
+double stop_time(uint64_t start_time) {
+  uint64_t elapsed = stm_since(start_time);
+  double elapsed_milliseconds = stm_ms(elapsed);
+  return elapsed_milliseconds;
 }
