@@ -85,6 +85,7 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
   bool generate_cycles = false;
   int generate_number_of_verticies = -1;
   int number_of_tests = -1;
+  double time_limit = -1.0;
 
   // Number of line to report in case of an error
   uint32_t number_of_line = 1;
@@ -155,6 +156,13 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
       generate_number_of_verticies = std::atoi(param.config_param_value);
     } else if (str_compare(param.config_param_name, "number_of_tests")) {
       number_of_tests = std::atoi(param.config_param_value);
+    } else if (str_compare(param.config_param_name, "time_limit")) {
+      time_limit = std::atof(param.config_param_value);
+      if (fabs(time_limit + 1.0) < 10e-6) {
+        printf("No time limit set\n");
+      } else {
+        printf("Time limit: %.2f minutes\n", time_limit);
+      }
     } else {
       // Unkown type of parameter
       report_unknown_parameter(param.config_param_name, number_of_line);
@@ -200,6 +208,7 @@ ConfigFlags read_and_set_config_flags(const char* path_to_config_file) {
     .attempt_limit = attempt_limit,
     .generate_cycles = generate_cycles,
     .number_of_verticies = generate_number_of_verticies,
-    .number_of_tests = number_of_tests
+    .number_of_tests = number_of_tests,
+    .time_limit = time_limit
   });
 }

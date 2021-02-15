@@ -379,7 +379,20 @@ int main(int argc, char **argv) {
   std::random_device rd;
   std::mt19937 g(rd());
 
+  // Start timer for total time for all tests
+  uint64_t total_time = stm_now();
+
   while(true) {
+    // Stop timer if we've reached the time limit for tests
+    double total_time_elapsed = stop_time(total_time);
+    double total_time_elapsed_seconds = fabs(flags.time_limit + 1.0) < 10e-6 ? -2.0 : (total_time_elapsed / 1000.0 / 60.0);
+    if (total_time_elapsed_seconds > flags.time_limit) {
+      set_text_yellow();
+      printf("\nReached time limit");
+      reset_text_color();
+      break;
+    }
+
     BundleOfGraphs bundle;
 
     if (flags.generate_cycles) {

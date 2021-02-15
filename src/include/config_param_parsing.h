@@ -13,6 +13,7 @@ struct ConfigFlags {
   bool generate_cycles;
   int number_of_verticies = 1;
   int number_of_tests = 1;
+  double time_limit = -1.0;
 };
 
 /// Struct stores information about configuration parameter
