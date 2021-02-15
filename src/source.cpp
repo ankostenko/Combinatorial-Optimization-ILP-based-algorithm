@@ -385,14 +385,14 @@ int main(int argc, char **argv) {
     if (flags.generate_cycles) {
       std::shuffle(vertex_vector.begin(), vertex_vector.end(), g);
       for (int vertex: vertex_vector) {
-        bundle.first.add_vertex(Vertex({vertex}));
+        bundle.first.add_vertex(Vertex({static_cast<int16_t>(vertex)}));
       }
 
       bundle.first = create_edges_from_verticies(&bundle.first);
 
       std::shuffle(vertex_vector.begin(), vertex_vector.end(), g);
       for (int vertex: vertex_vector) {
-        bundle.second.add_vertex(Vertex({vertex}));
+        bundle.second.add_vertex(Vertex({static_cast<int16_t>(vertex)}));
       }
       bundle.second = create_edges_from_verticies(&bundle.second);
     } else {

@@ -3,7 +3,7 @@
 
 SET src=./src/source.cpp ./src/utils.cpp ./src/config_param_parsing.cpp ./src/win_console_colors.cpp ./src/cycle_extraction.cpp ./src/ilp.cpp ./src/print/printing.cpp ./src/graph.cpp
 SET output=./bin/ham.exe
-SET arguments=-Wall -pedantic -Wextra -Ofast -g0
+SET arguments=-Wall -pedantic -Wextra -Ofast -g0 -target x86_64-pc-windows-msvc
 SET libraries=-lkernel32 -L./external/ -llibscip -lsoplex
 
 @rem set sanitize=%1

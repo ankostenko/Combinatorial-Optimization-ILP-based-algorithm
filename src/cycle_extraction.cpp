@@ -15,7 +15,7 @@ Graph extract_verticies_from_string(const char *str) {
 	std::string token;
   while (std::getline(ss, token, ' ')) {
     if (token == "\n") { continue; }
-    cycle.add_vertex(Vertex{ atoi(token.c_str()) });
+    cycle.add_vertex(Vertex{ static_cast<int16_t>(atoi(token.c_str())) });
   }
 
   return cycle;

@@ -5,30 +5,30 @@
 #include "stretchy_buffer.h"
 #include "scip/scip.h"
 
-enum TypeOfGraph {
+enum TypeOfGraph : int8_t {
   DIRECTED, 
   UNDIRECTED
 };
 
-enum GraphName {
+enum GraphName : int8_t {
   Z_GRAPH,
   W_GRAPH,
 };
 
 struct Vertex {
-  int number;
+  int16_t number;
 };
 
 struct Edge {
+  SCIP_VAR *var;
+
   Vertex start;
   Vertex end;
-
-  SCIP_VAR *var;
+  
+  GraphName graph_name;
   bool visited;
   bool visited_for_cycle_search;
   bool fixed;
-
-  GraphName graph_name;
 };
 
 template<typename T> struct Tuple {
